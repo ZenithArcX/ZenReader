@@ -56,6 +56,18 @@ export const Controls: React.FC<Props> = ({
     boxSizing: 'border-box'
   };
 
+  const smallBtnStyle: React.CSSProperties = {
+    padding: '4px 8px',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    borderRadius: '6px',
+    border: `1px solid ${currentTheme.border}`,
+    background: currentTheme.btnBg,
+    color: currentTheme.btnText,
+    lineHeight: 1
+  };
+
   const selectStyle: React.CSSProperties = {
     padding: '5px 8px',
     borderRadius: '6px',
@@ -65,6 +77,11 @@ export const Controls: React.FC<Props> = ({
     fontSize: '13px',
     maxWidth: '100%',
     boxSizing: 'border-box'
+  };
+
+  const changeWpm = (delta: number) => {
+    const nextWpm = Math.min(Math.max(settings.wpm + delta, 50), 1000);
+    onSettingsChange({ wpm: nextWpm });
   };
 
   return (
@@ -99,7 +116,6 @@ export const Controls: React.FC<Props> = ({
           onClick={() => onSettingsChange({ ttsEnabled: !settings.ttsEnabled })} 
           style={{ 
             ...btnStyle, 
-            background: settings.ttsEnabled ? currentTheme.btnBg : currentTheme.btnBg,
             color: settings.ttsEnabled ? '#10b981' : currentTheme.btnText,
             borderColor: settings.ttsEnabled ? '#10b981' : currentTheme.border
           }}
@@ -133,13 +149,15 @@ export const Controls: React.FC<Props> = ({
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
+        gap: '10px',
         flexWrap: 'wrap',
         justifyContent: 'center',
         width: '100%'
       }}>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+        {/* WPM Control with - / + Buttons */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
           <span>WPM: <strong>{settings.wpm}</strong></span>
+          <button onClick={() => changeWpm(-10)} style={smallBtnStyle} title="Decrease WPM by 10">−</button>
           <input
             type="range"
             min={50}
@@ -147,9 +165,10 @@ export const Controls: React.FC<Props> = ({
             step={10}
             value={settings.wpm}
             onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
-            style={{ width: '80px', accentColor: settings.focusColor }}
+            style={{ width: '70px', accentColor: settings.focusColor }}
           />
-        </label>
+          <button onClick={() => changeWpm(10)} style={smallBtnStyle} title="Increase WPM by 10">+</button>
+        </div>
         
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px', whiteSpace: 'nowrap' }}>
           Theme:
@@ -244,19 +263,6 @@ export const Controls: React.FC<Props> = ({
                 step={0.1}
                 value={settings.ttsPitch}
                 onChange={(e) => onSettingsChange({ ttsPitch: parseFloat(e.target.value) })}
-                style={{ accentColor: settings.focusColor }}
-              />
-            </label>
-
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 110px', fontSize: '12px' }}>
-              <span>Speech Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
-              <input
-                type="range"
-                min={0.5}
-                max={2.0}
-                step={0.1}
-                value={settings.ttsRate}
-                onChange={(e) => onSettingsChange({ ttsRate: parseFloat(e.target.value) })}
                 style={{ accentColor: settings.focusColor }}
               />
             </label>

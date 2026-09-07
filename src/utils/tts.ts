@@ -43,12 +43,19 @@ export function subscribeVoices(callback: (voices: SpeechSynthesisVoice[]) => vo
   };
 }
 
+export function calculateRateFromWpm(wpm: number): number {
+  // Baseline: ~160 WPM = 1.0x rate
+  const rate = wpm / 160;
+  return Math.min(Math.max(rate, 0.5), 4.0);
+}
+
 export function speakText(
   text: string,
   options: {
     voiceURI?: string;
     pitch?: number;
     rate?: number;
+    wpm?: number;
     onEnd?: () => void;
   }
 ) {
@@ -71,7 +78,15 @@ export function speakText(
   }
 
   utterance.pitch = options.pitch ?? 1.0;
-  utterance.rate = options.rate ?? 1.0;
+  
+  // Rate: use explicit rate or calculate from WPM
+  if (options.rate !== undefined && options.rate !== 1.0) {
+    utterance.rate = options.rate;
+  } else if (options.wpm) {
+    utterance.rate = calculateRateFromWpm(options.wpm);
+  } else {
+    utterance.rate = 1.0;
+  }
 
   if (options.onEnd) {
     utterance.onend = options.onEnd;

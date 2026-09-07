@@ -195,7 +195,8 @@ export const ReaderView: React.FC<Props> = ({
           speakText(textToSpeak, {
             voiceURI: settings.ttsVoiceURI,
             pitch: settings.ttsPitch,
-            rate: settings.ttsRate
+            rate: settings.ttsRate,
+            wpm: settings.wpm
           });
         }
       }
