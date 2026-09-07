@@ -43,14 +43,87 @@ export function subscribeVoices(callback: (voices: SpeechSynthesisVoice[]) => vo
   };
 }
 
+export function isScannedPlaceholder(text: string): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase().trim();
+  return (
+    lower.includes('scanned page') ||
+    lower.includes('no extractable text layer') ||
+    lower.includes('[scanned')
+  );
+}
+
 export function calculateRateFromWpm(wpm: number): number {
   // Baseline: ~160 WPM = 1.0x rate
   const rate = wpm / 160;
-  return Math.min(Math.max(rate, 0.5), 4.0);
+  return Math.min(Math.max(rate, 0.5), 3.5);
 }
 
-export function speakText(
-  text: string,
+export function speakSentence(
+  sentenceText: string,
+  options: {
+    voiceURI?: string;
+    pitch?: number;
+    rate?: number;
+    wpm?: number;
+    onWordBoundary?: (wordCharIndex: number) => void;
+    onEnd?: () => void;
+    onError?: () => void;
+  }
+): SpeechSynthesisUtterance | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return null;
+  }
+
+  window.speechSynthesis.cancel(); // Stop any ongoing speech
+
+  if (!sentenceText.trim() || isScannedPlaceholder(sentenceText)) {
+    if (options.onEnd) options.onEnd();
+    return null;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(sentenceText);
+  const voices = getAvailableVoices();
+
+  if (options.voiceURI) {
+    const selectedVoice = voices.find(v => v.voiceURI === options.voiceURI);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+  }
+
+  utterance.pitch = options.pitch ?? 1.0;
+  
+  if (options.rate !== undefined && options.rate !== 1.0) {
+    utterance.rate = options.rate;
+  } else if (options.wpm) {
+    utterance.rate = calculateRateFromWpm(options.wpm);
+  } else {
+    utterance.rate = 1.0;
+  }
+
+  if (options.onWordBoundary) {
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        options.onWordBoundary!(event.charIndex);
+      }
+    };
+  }
+
+  if (options.onEnd) {
+    utterance.onend = () => options.onEnd!();
+  }
+
+  if (options.onError) {
+    utterance.onerror = () => options.onError!();
+  }
+
+  window.speechSynthesis.speak(utterance);
+  return utterance;
+}
+
+export function speakWord(
+  wordText: string,
   options: {
     voiceURI?: string;
     pitch?: number;
@@ -63,11 +136,14 @@ export function speakText(
     return;
   }
 
-  window.speechSynthesis.cancel(); // Stop any ongoing speech
+  window.speechSynthesis.cancel();
 
-  if (!text.trim()) return;
+  if (!wordText.trim() || isScannedPlaceholder(wordText)) {
+    if (options.onEnd) options.onEnd();
+    return;
+  }
 
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = new SpeechSynthesisUtterance(wordText);
   const voices = getAvailableVoices();
 
   if (options.voiceURI) {
@@ -79,7 +155,6 @@ export function speakText(
 
   utterance.pitch = options.pitch ?? 1.0;
   
-  // Rate: use explicit rate or calculate from WPM
   if (options.rate !== undefined && options.rate !== 1.0) {
     utterance.rate = options.rate;
   } else if (options.wpm) {

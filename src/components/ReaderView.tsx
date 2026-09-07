@@ -5,7 +5,7 @@ import { AppSettings, ShelfItem } from '../storage/db';
 import { Controls } from './Controls';
 import { themes } from '../theme/colors';
 import { PageSelectorModal } from './PageSelectorModal';
-import { speakText, stopSpeech } from '../utils/tts';
+import { speakSentence, stopSpeech, isScannedPlaceholder } from '../utils/tts';
 
 interface Props {
   document: ReaderDocument;
@@ -111,6 +111,9 @@ export const ReaderView: React.FC<Props> = ({
       setPageIdx(p => p + 1);
       setSentenceIdx(0);
       setWordIdx(0);
+    } else {
+      setIsPlaying(false);
+      stopSpeech();
     }
   };
 
@@ -150,18 +153,22 @@ export const ReaderView: React.FC<Props> = ({
           break;
         case 'ArrowRight':
           e.preventDefault();
+          stopSpeech();
           handleNext();
           break;
         case 'ArrowLeft':
           e.preventDefault();
+          stopSpeech();
           handlePrev();
           break;
         case 'ArrowDown':
           e.preventDefault();
+          stopSpeech();
           handleNextSentence();
           break;
         case 'ArrowUp':
           e.preventDefault();
+          stopSpeech();
           handlePrevSentence();
           break;
         case 'Escape':
@@ -185,36 +192,73 @@ export const ReaderView: React.FC<Props> = ({
     onProgressUpdate({ currentPage: pageIdx, currentSentence: sentenceIdx, currentWord: wordIdx });
   }, [pageIdx, sentenceIdx, wordIdx]);
   
-  // Playback & TTS loop
+  // Playback & TTS Loop
   useEffect(() => {
-    if (isPlaying) {
-      // Speak current word or sentence if TTS is enabled
-      if (settings.ttsEnabled && sentence) {
-        const textToSpeak = sentence.words[wordIdx]?.text;
-        if (textToSpeak) {
-          speakText(textToSpeak, {
-            voiceURI: settings.ttsVoiceURI,
-            pitch: settings.ttsPitch,
-            rate: settings.ttsRate,
-            wpm: settings.wpm
-          });
-        }
-      }
+    if (!isPlaying || !sentence) {
+      stopSpeech();
+      return;
+    }
 
+    // Check if current sentence is a scanned placeholder string
+    if (isScannedPlaceholder(sentence.text)) {
+      // Auto-skip scanned page placeholders without reading or halting!
+      const timer = setTimeout(() => {
+        handleNextSentence();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    if (settings.ttsEnabled) {
+      // Speech mode: speak full sentence smoothly, tracking word boundaries
+      speakSentence(sentence.text, {
+        voiceURI: settings.ttsVoiceURI,
+        pitch: settings.ttsPitch,
+        rate: settings.ttsRate,
+        wpm: settings.wpm,
+        onWordBoundary: (charIndex) => {
+          if (!sentence || !sentence.words) return;
+          let accumLen = 0;
+          for (let i = 0; i < sentence.words.length; i++) {
+            const wordLen = sentence.words[i].text.length;
+            if (charIndex >= accumLen && charIndex <= accumLen + wordLen + 2) {
+              setWordIdx(i);
+              break;
+            }
+            accumLen += wordLen + 1;
+          }
+        },
+        onEnd: () => {
+          handleNextSentence();
+        }
+      });
+
+      return () => {
+        // Don't cancel speech immediately if advancing naturally within sentence
+      };
+    } else {
+      // Non-TTS RSVP visual timer loop
       const msPerWord = 60000 / settings.wpm;
       timeoutRef.current = window.setTimeout(() => {
         advance();
       }, msPerWord);
-    } else {
-      stopSpeech();
+
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
     }
-    
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [isPlaying, pageIdx, sentenceIdx, wordIdx, settings.wpm, settings.readingMode, settings.ttsEnabled, settings.ttsVoiceURI, settings.ttsPitch, settings.ttsRate]);
+  }, [
+    isPlaying,
+    pageIdx,
+    sentenceIdx,
+    settings.ttsEnabled,
+    settings.wpm,
+    settings.readingMode,
+    settings.ttsVoiceURI,
+    settings.ttsPitch,
+    settings.ttsRate
+  ]);
 
   // Clean up speech on unmount
   useEffect(() => {
@@ -433,8 +477,14 @@ export const ReaderView: React.FC<Props> = ({
                 return !p;
               });
             }}
-            onNext={handleNext}
-            onPrev={handlePrev}
+            onNext={() => {
+              stopSpeech();
+              handleNext();
+            }}
+            onPrev={() => {
+              stopSpeech();
+              handlePrev();
+            }}
             settings={settings}
             onSettingsChange={onSettingsChange}
             isLocked={isLocked}
@@ -451,6 +501,7 @@ export const ReaderView: React.FC<Props> = ({
           theme={currentTheme}
           initialPageIdx={pageIdx}
           onSelectPage={(newIdx) => {
+            stopSpeech();
             setPageIdx(newIdx);
             setSentenceIdx(0);
             setWordIdx(0);
