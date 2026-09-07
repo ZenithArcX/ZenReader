@@ -34,6 +34,7 @@ export const ReaderView: React.FC<Props> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const timeoutRef = useRef<number | null>(null);
+  const spokenSentenceKeyRef = useRef<string>('');
 
   useEffect(() => {
     const handleFSChange = () => {
@@ -154,21 +155,25 @@ export const ReaderView: React.FC<Props> = ({
         case 'ArrowRight':
           e.preventDefault();
           stopSpeech();
+          spokenSentenceKeyRef.current = '';
           handleNext();
           break;
         case 'ArrowLeft':
           e.preventDefault();
           stopSpeech();
+          spokenSentenceKeyRef.current = '';
           handlePrev();
           break;
         case 'ArrowDown':
           e.preventDefault();
           stopSpeech();
+          spokenSentenceKeyRef.current = '';
           handleNextSentence();
           break;
         case 'ArrowUp':
           e.preventDefault();
           stopSpeech();
+          spokenSentenceKeyRef.current = '';
           handlePrevSentence();
           break;
         case 'Escape':
@@ -196,6 +201,7 @@ export const ReaderView: React.FC<Props> = ({
   useEffect(() => {
     if (!isPlaying || !sentence) {
       stopSpeech();
+      spokenSentenceKeyRef.current = '';
       return;
     }
 
@@ -208,30 +214,35 @@ export const ReaderView: React.FC<Props> = ({
     }
 
     if (settings.ttsEnabled) {
-      if (settings.readingMode === 'sentence') {
-        // Sentence Mode with Audio ON: Speak full sentence smoothly like a natural sentence!
-        speakSentence(sentence.text, {
-          voiceURI: settings.ttsVoiceURI,
-          pitch: settings.ttsPitch,
-          rate: settings.ttsRate,
-          onWordBoundary: (charIndex: number) => {
-            if (!sentence || !sentence.words) return;
-            let accumLen = 0;
-            for (let i = 0; i < sentence.words.length; i++) {
-              const wordLen = sentence.words[i].text.length;
-              if (charIndex >= accumLen && charIndex <= accumLen + wordLen + 2) {
-                setWordIdx(i);
-                break;
+      const currentSentenceKey = `${pageIdx}-${sentenceIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
+      
+      // Trigger full sentence speech audio once per sentence/setting change
+      if (spokenSentenceKeyRef.current !== currentSentenceKey) {
+        spokenSentenceKeyRef.current = currentSentenceKey;
+        
+        if (settings.readingMode === 'sentence') {
+          speakSentence(sentence.text, {
+            voiceURI: settings.ttsVoiceURI,
+            pitch: settings.ttsPitch,
+            rate: settings.ttsRate,
+            onWordBoundary: (charIndex: number) => {
+              if (!sentence || !sentence.words) return;
+              let accumLen = 0;
+              for (let i = 0; i < sentence.words.length; i++) {
+                const wordLen = sentence.words[i].text.length;
+                if (charIndex >= accumLen && charIndex <= accumLen + wordLen + 2) {
+                  setWordIdx(i);
+                  break;
+                }
+                accumLen += wordLen + 1;
               }
-              accumLen += wordLen + 1;
             }
-          },
-          onEnd: () => {
-            handleNextSentence();
-          }
-        });
-      } else {
-        // Word Mode with Audio ON: Speak word by word at Voice Speed
+          });
+        }
+      }
+
+      if (settings.readingMode === 'word') {
+        // Word Mode with Audio ON: speak individual word
         const currentWordObj = sentence.words[wordIdx];
         if (currentWordObj && currentWordObj.text) {
           speakWord(currentWordObj.text, {
@@ -240,20 +251,22 @@ export const ReaderView: React.FC<Props> = ({
             rate: settings.ttsRate
           });
         }
-
-        // Timer interval driven by Voice Speed (ttsRate)
-        const msPerWord = Math.max(150, Math.round(400 / settings.ttsRate));
-        timeoutRef.current = window.setTimeout(() => {
-          advance();
-        }, msPerWord);
-
-        return () => {
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-          }
-        };
       }
+
+      // Visual highlight advancement timer driven by Voice Speed (ttsRate)
+      // 1.0x rate = ~380ms per word
+      const msPerWord = Math.max(100, Math.round(380 / settings.ttsRate));
+      timeoutRef.current = window.setTimeout(() => {
+        advance();
+      }, msPerWord);
+
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
     } else {
+      spokenSentenceKeyRef.current = '';
       // Audio OFF: Pure visual RSVP WPM timer loop
       const msPerWord = Math.round(60000 / settings.wpm);
       timeoutRef.current = window.setTimeout(() => {
@@ -498,10 +511,12 @@ export const ReaderView: React.FC<Props> = ({
             }}
             onNext={() => {
               stopSpeech();
+              spokenSentenceKeyRef.current = '';
               handleNext();
             }}
             onPrev={() => {
               stopSpeech();
+              spokenSentenceKeyRef.current = '';
               handlePrev();
             }}
             settings={settings}
@@ -521,6 +536,7 @@ export const ReaderView: React.FC<Props> = ({
           initialPageIdx={pageIdx}
           onSelectPage={(newIdx) => {
             stopSpeech();
+            spokenSentenceKeyRef.current = '';
             setPageIdx(newIdx);
             setSentenceIdx(0);
             setWordIdx(0);
