@@ -57,15 +57,20 @@ export const Controls: React.FC<Props> = ({
   };
 
   const smallBtnStyle: React.CSSProperties = {
-    padding: '4px 8px',
-    fontSize: '13px',
+    padding: '6px 12px',
+    fontSize: '14px',
     fontWeight: 'bold',
     cursor: 'pointer',
     borderRadius: '6px',
     border: `1px solid ${currentTheme.border}`,
     background: currentTheme.btnBg,
     color: currentTheme.btnText,
-    lineHeight: 1
+    lineHeight: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: '32px',
+    touchAction: 'manipulation'
   };
 
   const selectStyle: React.CSSProperties = {
@@ -159,10 +164,19 @@ export const Controls: React.FC<Props> = ({
         justifyContent: 'center',
         width: '100%'
       }}>
-        {/* If Audio is ON -> Use Voice Speed Meter. If Audio is OFF -> Use WPM Meter */}
+        {/* Generous, finger-friendly slider width for mobile devices */}
         {settings.ttsEnabled ? (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-            <span>Voice Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            whiteSpace: 'nowrap',
+            flex: '1 1 200px',
+            maxWidth: '340px',
+            minWidth: '180px'
+          }}>
+            <span style={{ minWidth: '95px' }}>Voice Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
             <button onClick={() => changeTtsRate(-0.1)} style={smallBtnStyle} title="Decrease Voice Speed by 0.1x">−</button>
             <input
               type="range"
@@ -171,13 +185,22 @@ export const Controls: React.FC<Props> = ({
               step={0.1}
               value={settings.ttsRate}
               onChange={(e) => onSettingsChange({ ttsRate: parseFloat(e.target.value) })}
-              style={{ width: '70px', accentColor: settings.focusColor }}
+              style={{ flex: 1, minWidth: '100px', accentColor: settings.focusColor }}
             />
             <button onClick={() => changeTtsRate(0.1)} style={smallBtnStyle} title="Increase Voice Speed by 0.1x">+</button>
           </div>
         ) : (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-            <span>WPM: <strong>{settings.wpm}</strong></span>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            whiteSpace: 'nowrap',
+            flex: '1 1 200px',
+            maxWidth: '340px',
+            minWidth: '180px'
+          }}>
+            <span style={{ minWidth: '70px' }}>WPM: <strong>{settings.wpm}</strong></span>
             <button onClick={() => changeWpm(-10)} style={smallBtnStyle} title="Decrease WPM by 10">−</button>
             <input
               type="range"
@@ -186,7 +209,7 @@ export const Controls: React.FC<Props> = ({
               step={10}
               value={settings.wpm}
               onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
-              style={{ width: '70px', accentColor: settings.focusColor }}
+              style={{ flex: 1, minWidth: '100px', accentColor: settings.focusColor }}
             />
             <button onClick={() => changeWpm(10)} style={smallBtnStyle} title="Increase WPM by 10">+</button>
           </div>
@@ -276,7 +299,7 @@ export const Controls: React.FC<Props> = ({
               </select>
             </label>
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 110px', fontSize: '12px' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 140px', fontSize: '12px' }}>
               <span>Pitch: <strong>{settings.ttsPitch.toFixed(1)}x</strong></span>
               <input
                 type="range"
@@ -285,7 +308,7 @@ export const Controls: React.FC<Props> = ({
                 step={0.1}
                 value={settings.ttsPitch}
                 onChange={(e) => onSettingsChange({ ttsPitch: parseFloat(e.target.value) })}
-                style={{ accentColor: settings.focusColor }}
+                style={{ width: '100%', accentColor: settings.focusColor }}
               />
             </label>
           </div>
