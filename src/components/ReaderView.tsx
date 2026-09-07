@@ -5,7 +5,7 @@ import { AppSettings, ShelfItem } from '../storage/db';
 import { Controls } from './Controls';
 import { themes } from '../theme/colors';
 import { PageSelectorModal } from './PageSelectorModal';
-import { speakSentence, speakWord, stopSpeech, isScannedPlaceholder } from '../utils/tts';
+import { speakWord, stopSpeech, isScannedPlaceholder } from '../utils/tts';
 
 interface Props {
   document: ReaderDocument;
@@ -34,7 +34,6 @@ export const ReaderView: React.FC<Props> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const timeoutRef = useRef<number | null>(null);
-  const spokenSentenceKeyRef = useRef<string>('');
 
   useEffect(() => {
     const handleFSChange = () => {
@@ -55,11 +54,14 @@ export const ReaderView: React.FC<Props> = ({
   const page = document.pages[pageIdx];
   const sentence = page?.sentences[sentenceIdx];
   
+  // Step size: 2 words at a time in Sentence Mode, 1 word in Word Mode
+  const stepSize = settings.readingMode === 'sentence' ? 2 : 1;
+
   const handleNext = () => {
     if (!page || !sentence) return false;
     
-    if (wordIdx + 1 < sentence.words.length) {
-      setWordIdx(w => w + 1);
+    if (wordIdx + stepSize < sentence.words.length) {
+      setWordIdx(w => w + stepSize);
       return true;
     }
     
@@ -82,15 +84,15 @@ export const ReaderView: React.FC<Props> = ({
   const handlePrev = () => {
     if (!page || !sentence) return;
     
-    if (wordIdx > 0) {
-      setWordIdx(w => w - 1);
+    if (wordIdx >= stepSize) {
+      setWordIdx(w => w - stepSize);
       return;
     }
     
     if (sentenceIdx > 0) {
       const prevSentence = page.sentences[sentenceIdx - 1];
       setSentenceIdx(s => s - 1);
-      setWordIdx(prevSentence ? Math.max(0, prevSentence.words.length - 1) : 0);
+      setWordIdx(prevSentence ? Math.max(0, prevSentence.words.length - stepSize) : 0);
       return;
     }
     
@@ -99,7 +101,7 @@ export const ReaderView: React.FC<Props> = ({
       const lastSentence = prevPage?.sentences[prevPage.sentences.length - 1];
       setPageIdx(p => p - 1);
       setSentenceIdx(prevPage ? Math.max(0, prevPage.sentences.length - 1) : 0);
-      setWordIdx(lastSentence ? Math.max(0, lastSentence.words.length - 1) : 0);
+      setWordIdx(lastSentence ? Math.max(0, lastSentence.words.length - stepSize) : 0);
     }
   };
 
@@ -155,25 +157,21 @@ export const ReaderView: React.FC<Props> = ({
         case 'ArrowRight':
           e.preventDefault();
           stopSpeech();
-          spokenSentenceKeyRef.current = '';
           handleNext();
           break;
         case 'ArrowLeft':
           e.preventDefault();
           stopSpeech();
-          spokenSentenceKeyRef.current = '';
           handlePrev();
           break;
         case 'ArrowDown':
           e.preventDefault();
           stopSpeech();
-          spokenSentenceKeyRef.current = '';
           handleNextSentence();
           break;
         case 'ArrowUp':
           e.preventDefault();
           stopSpeech();
-          spokenSentenceKeyRef.current = '';
           handlePrevSentence();
           break;
         case 'Escape':
@@ -201,7 +199,6 @@ export const ReaderView: React.FC<Props> = ({
   useEffect(() => {
     if (!isPlaying || !sentence) {
       stopSpeech();
-      spokenSentenceKeyRef.current = '';
       return;
     }
 
@@ -214,51 +211,25 @@ export const ReaderView: React.FC<Props> = ({
     }
 
     if (settings.ttsEnabled) {
-      const currentSentenceKey = `${pageIdx}-${sentenceIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
-      
-      // Trigger full sentence speech audio once per sentence/setting change
-      if (spokenSentenceKeyRef.current !== currentSentenceKey) {
-        spokenSentenceKeyRef.current = currentSentenceKey;
-        
-        if (settings.readingMode === 'sentence') {
-          speakSentence(sentence.text, {
-            voiceURI: settings.ttsVoiceURI,
-            pitch: settings.ttsPitch,
-            rate: settings.ttsRate,
-            onWordBoundary: (charIndex: number) => {
-              if (!sentence || !sentence.words) return;
-              let accumLen = 0;
-              for (let i = 0; i < sentence.words.length; i++) {
-                const wordLen = sentence.words[i].text.length;
-                if (charIndex >= accumLen && charIndex <= accumLen + wordLen + 2) {
-                  setWordIdx(i);
-                  break;
-                }
-                accumLen += wordLen + 1;
-              }
-            }
-          });
-        }
+      // Audio ON: Speak current active phrase (2 words in Sentence Mode, 1 word in Word Mode)
+      const currentPhraseText = sentence.words
+        .slice(wordIdx, wordIdx + stepSize)
+        .map(w => w.text)
+        .join(' ');
+
+      if (currentPhraseText) {
+        speakWord(currentPhraseText, {
+          voiceURI: settings.ttsVoiceURI,
+          pitch: settings.ttsPitch,
+          rate: settings.ttsRate
+        });
       }
 
-      if (settings.readingMode === 'word') {
-        // Word Mode with Audio ON: speak individual word
-        const currentWordObj = sentence.words[wordIdx];
-        if (currentWordObj && currentWordObj.text) {
-          speakWord(currentWordObj.text, {
-            voiceURI: settings.ttsVoiceURI,
-            pitch: settings.ttsPitch,
-            rate: settings.ttsRate
-          });
-        }
-      }
-
-      // Visual highlight advancement timer driven by Voice Speed (ttsRate)
-      // 1.0x rate = ~380ms per word
-      const msPerWord = Math.max(100, Math.round(380 / settings.ttsRate));
+      // Visual chunk advancement timer driven by Voice Speed (ttsRate)
+      const msPerChunk = Math.max(180, Math.round((380 * stepSize) / settings.ttsRate));
       timeoutRef.current = window.setTimeout(() => {
         advance();
-      }, msPerWord);
+      }, msPerChunk);
 
       return () => {
         if (timeoutRef.current) {
@@ -266,12 +237,11 @@ export const ReaderView: React.FC<Props> = ({
         }
       };
     } else {
-      spokenSentenceKeyRef.current = '';
-      // Audio OFF: Pure visual RSVP WPM timer loop
-      const msPerWord = Math.round(60000 / settings.wpm);
+      // Audio OFF: Visual RSVP WPM timer loop
+      const msPerChunk = Math.round((60000 * stepSize) / settings.wpm);
       timeoutRef.current = window.setTimeout(() => {
         advance();
-      }, msPerWord);
+      }, msPerChunk);
 
       return () => {
         if (timeoutRef.current) {
@@ -284,6 +254,7 @@ export const ReaderView: React.FC<Props> = ({
     pageIdx,
     sentenceIdx,
     wordIdx,
+    stepSize,
     settings.readingMode,
     settings.ttsEnabled,
     settings.ttsVoiceURI,
@@ -303,6 +274,9 @@ export const ReaderView: React.FC<Props> = ({
   
   const currentTheme = themes[settings.theme] || themes.light;
   const hideControls = isFocusMode || isLocked;
+
+  // Active 2-word chunk calculation for Sentence Mode
+  const currentChunkIdx = Math.floor(wordIdx / 2);
 
   return (
     <div style={{
@@ -474,8 +448,8 @@ export const ReaderView: React.FC<Props> = ({
               maxWidth: '100%'
             }}>
               {sentence.words.map((w, i) => {
-                // Highlight a 2-3 word window at a time with smooth transition
-                const isHighlighted = i >= wordIdx && i < Math.min(sentence.words.length, wordIdx + 2);
+                // Highlight 2-word phrase chunks together in Sentence Mode
+                const isHighlighted = Math.floor(i / 2) === currentChunkIdx;
                 return (
                   <span key={i} style={{ 
                     opacity: isHighlighted ? 1 : 0.28,
@@ -513,12 +487,10 @@ export const ReaderView: React.FC<Props> = ({
             }}
             onNext={() => {
               stopSpeech();
-              spokenSentenceKeyRef.current = '';
               handleNext();
             }}
             onPrev={() => {
               stopSpeech();
-              spokenSentenceKeyRef.current = '';
               handlePrev();
             }}
             settings={settings}
@@ -538,7 +510,6 @@ export const ReaderView: React.FC<Props> = ({
           initialPageIdx={pageIdx}
           onSelectPage={(newIdx) => {
             stopSpeech();
-            spokenSentenceKeyRef.current = '';
             setPageIdx(newIdx);
             setSentenceIdx(0);
             setWordIdx(0);
