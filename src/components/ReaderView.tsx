@@ -5,7 +5,7 @@ import { AppSettings, ShelfItem } from '../storage/db';
 import { Controls } from './Controls';
 import { themes } from '../theme/colors';
 import { PageSelectorModal } from './PageSelectorModal';
-import { speakSentence, stopSpeech, isScannedPlaceholder } from '../utils/tts';
+import { speakWord, stopSpeech, isScannedPlaceholder, calculateRateFromWpm } from '../utils/tts';
 
 interface Props {
   document: ReaderDocument;
@@ -192,68 +192,56 @@ export const ReaderView: React.FC<Props> = ({
     onProgressUpdate({ currentPage: pageIdx, currentSentence: sentenceIdx, currentWord: wordIdx });
   }, [pageIdx, sentenceIdx, wordIdx]);
   
-  // Playback & TTS Loop
+  // Playback Loop (Unified WPM timing for both Audio ON and Audio OFF)
   useEffect(() => {
     if (!isPlaying || !sentence) {
       stopSpeech();
       return;
     }
 
-    // Check if current sentence is a scanned placeholder string
+    // Skip scanned placeholder strings automatically
     if (isScannedPlaceholder(sentence.text)) {
-      // Auto-skip scanned page placeholders without reading or halting!
       const timer = setTimeout(() => {
         handleNextSentence();
-      }, 500);
+      }, 400);
       return () => clearTimeout(timer);
     }
 
+    // Speak current word if audio is enabled
     if (settings.ttsEnabled) {
-      // Speech mode: speak full sentence smoothly, tracking word boundaries
-      speakSentence(sentence.text, {
-        voiceURI: settings.ttsVoiceURI,
-        pitch: settings.ttsPitch,
-        rate: settings.ttsRate,
-        onWordBoundary: (charIndex) => {
-          if (!sentence || !sentence.words) return;
-          let accumLen = 0;
-          for (let i = 0; i < sentence.words.length; i++) {
-            const wordLen = sentence.words[i].text.length;
-            if (charIndex >= accumLen && charIndex <= accumLen + wordLen + 2) {
-              setWordIdx(i);
-              break;
-            }
-            accumLen += wordLen + 1;
-          }
-        },
-        onEnd: () => {
-          handleNextSentence();
-        }
-      });
-
-      return () => {
-        // Don't cancel speech immediately if advancing naturally within sentence
-      };
-    } else {
-      // Non-TTS RSVP visual timer loop
-      const msPerWord = 60000 / settings.wpm;
-      timeoutRef.current = window.setTimeout(() => {
-        advance();
-      }, msPerWord);
-
-      return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-      };
+      const currentWordObj = sentence.words[wordIdx];
+      if (currentWordObj && currentWordObj.text) {
+        const ttsRate = settings.ttsRate !== 1.0 
+          ? settings.ttsRate 
+          : calculateRateFromWpm(settings.wpm);
+        
+        speakWord(currentWordObj.text, {
+          voiceURI: settings.ttsVoiceURI,
+          pitch: settings.ttsPitch,
+          rate: ttsRate
+        });
+      }
     }
+
+    // Visual WPM timer tick
+    const msPerWord = 60000 / settings.wpm;
+    timeoutRef.current = window.setTimeout(() => {
+      advance();
+    }, msPerWord);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [
     isPlaying,
     pageIdx,
     sentenceIdx,
-    settings.ttsEnabled,
+    wordIdx,
     settings.wpm,
     settings.readingMode,
+    settings.ttsEnabled,
     settings.ttsVoiceURI,
     settings.ttsPitch,
     settings.ttsRate
