@@ -474,15 +474,17 @@ export const ReaderView: React.FC<Props> = ({
               maxWidth: '100%'
             }}>
               {sentence.words.map((w, i) => {
-                const isActive = i === wordIdx;
+                // Highlight a 2-3 word window at a time with smooth transition
+                const isHighlighted = i >= wordIdx && i < Math.min(sentence.words.length, wordIdx + 2);
                 return (
                   <span key={i} style={{ 
-                    opacity: isActive ? 1 : 0.35,
-                    background: isActive ? currentTheme.controlBg : 'transparent',
-                    border: `1px solid ${isActive ? currentTheme.border : 'transparent'}`,
-                    padding: '2px 6px',
-                    borderRadius: '5px',
-                    transition: 'opacity 0.12s ease, background 0.12s ease',
+                    opacity: isHighlighted ? 1 : 0.28,
+                    background: isHighlighted ? currentTheme.controlBg : 'transparent',
+                    border: `1px solid ${isHighlighted ? currentTheme.border : 'transparent'}`,
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    transition: 'opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), background 0.22s ease, border-color 0.22s ease, transform 0.22s ease',
+                    transform: isHighlighted ? 'scale(1.04)' : 'scale(1.0)',
                     display: 'inline-block'
                   }}>
                     <FocusWord word={w.text} focusColor={settings.focusColor} />
