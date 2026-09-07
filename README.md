@@ -6,6 +6,12 @@ All document processing, text parsing, rendering, and history persistence happen
 
 ---
 
+## 📖 Complete Documentation Book & Standalone HTML
+- **Technical Architecture Manual**: See [DOCUMENTATION_BOOK.md](file:///data/AKHIL/FocusReader/DOCUMENTATION_BOOK.md) for full details on project design choices, library justifications, development phase audits, and complete architectural documentation.
+- **Standalone Offline Single-File HTML**: Run `node scripts/bundle_single_file.js` to produce `dist/ZenReader_SingleFile_Standalone.html` — a single 100% self-contained offline HTML file that runs anywhere without a web server.
+
+---
+
 ## Features
 
 - **Local Document Support**:
@@ -14,12 +20,17 @@ All document processing, text parsing, rendering, and history persistence happen
   - **DOCX**: Client-side document text extraction using `mammoth`.
   - **TXT**: Plain text document tokenization using browser APIs.
 - **Reading Modes**:
-  - **Sentence Mode**: Displays full sentences with active word-by-word highlight progression and dimmed context.
+  - **Sentence Mode**: Displays full sentences with 2-word phrase chunking, active highlight progression, and dimmed context.
   - **Word Focus Mode**: Displays single centered words for RSVP (Rapid Serial Visual Presentation) speed reading.
-- **Page Preview & Jump Navigation**: Interactive page preview dialog with live text snippets and search filtering.
+- **Native Text-to-Speech (TTS)**: Built-in device voice synthesis with multi-language support, custom voice selection, pitch tuning, and isolated Voice Speed control.
+- **PWA & Touchscreen Features**:
+  - **Standalone PWA**: Installable on Android/Desktop to run without URL bar.
+  - **Mistouch Lock**: Touchscreen lock overlay preventing accidental taps while reading.
+  - **Fullscreen Toggle**: Native browser fullscreen mode trigger (`⛶ Maximise`).
+  - **Focus Mode**: Tap center text area to hide top/bottom navigation bars.
 - **Themes**: Light, Sepia, AMOLED Pitch Black (`#000000`), and Dark themes.
-- **WPM Controls**: Configurable reading speed from 50 to 1000 WPM with instant playback timing updates.
-- **Offline Persistence**: Reading history (page, sentence, word index) and preferences saved locally in IndexedDB.
+- **WPM & Speed Controls**: Configurable reading speed (50 to 1000 WPM) with `−` and `+` 10 WPM step buttons.
+- **Offline Persistence**: Reading history and preferences saved locally in IndexedDB.
 
 ---
 
@@ -30,6 +41,7 @@ All document processing, text parsing, rendering, and history persistence happen
 - **Build System**: Vite 5
 - **Local Storage**: IndexedDB
 - **Parsers**: `pdfjs-dist`, `jszip`, `mammoth`
+- **Speech Engine**: Native Browser Web Speech API (`window.speechSynthesis`)
 
 ---
 
@@ -60,32 +72,19 @@ The application runs at `http://localhost:5173`.
 
 ```bash
 npm run build
+node scripts/bundle_single_file.js
 ```
 
-Generates optimized production assets in the `dist/` folder.
+Generates production assets in `dist/` and standalone single-file HTML at `dist/ZenReader_SingleFile_Standalone.html`.
 
 ---
 
-## Project Structure
+## Technical Architecture Overview
 
-```
-src/
-├── components/          # Reader UI, playback controls, page selector modal, focus word component
-├── parser/              # Format parsers (PDF, EPUB, DOCX, TXT)
-├── storage/             # IndexedDB wrapper and settings management
-├── text/                # Sentence tokenizer and middle-character fixation calculation
-├── theme/               # Color definitions for Light, Sepia, AMOLED, and Dark themes
-├── App.tsx              # Root component and application state
-└── main.tsx             # Application entry point
-```
-
----
-
-## Technical Details
-
-- **Fixation Calculation (`src/text/focus.ts`)**: Strips non-word boundary punctuation before calculating odd/even central character positions to ensure accurate red focus alignment.
-- **Sentence Tokenizer (`src/text/tokenizer.ts`)**: Splitting algorithm that accounts for standard punctuation while ignoring common abbreviations (`Mr.`, `Dr.`, `i.e.`, `e.g.`).
-- **Dynamic Imports (`src/parser/index.ts`)**: Parser modules (`pdf.ts`, `epub.ts`, `docx.ts`) are lazy-loaded dynamically when a matching document type is selected.
+See [DOCUMENTATION_BOOK.md](file:///data/AKHIL/FocusReader/DOCUMENTATION_BOOK.md) for comprehensive deep dives into:
+1. **Fixation Calculation (`src/text/focus.ts`)**: Strips non-word boundary punctuation before calculating central character position.
+2. **EPUB Parser (`src/parser/epub.ts`)**: Replaced 345 KB `epubjs` with a 2 KB custom `JSZip` + `DOMParser` reader.
+3. **Web Speech Engine (`src/utils/tts.ts`)**: Manages system voice loading, pitch, rate, and scanned placeholder skipping.
 
 ---
 
