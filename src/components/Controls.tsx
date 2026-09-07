@@ -57,7 +57,7 @@ export const Controls: React.FC<Props> = ({
   };
 
   const smallBtnStyle: React.CSSProperties = {
-    padding: '6px 12px',
+    padding: '5px 10px',
     fontSize: '14px',
     fontWeight: 'bold',
     cursor: 'pointer',
@@ -69,7 +69,7 @@ export const Controls: React.FC<Props> = ({
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: '32px',
+    minWidth: '30px',
     touchAction: 'manipulation'
   };
 
@@ -98,7 +98,7 @@ export const Controls: React.FC<Props> = ({
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      gap: '12px',
+      gap: '14px',
       alignItems: 'center',
       padding: '12px 14px',
       background: currentTheme.controlBg,
@@ -108,7 +108,7 @@ export const Controls: React.FC<Props> = ({
       width: '100%',
       boxSizing: 'border-box'
     }}>
-      {/* Primary Action Buttons */}
+      {/* Row 1: Primary Action Buttons */}
       <div style={{
         display: 'flex',
         gap: '8px',
@@ -155,28 +155,52 @@ export const Controls: React.FC<Props> = ({
         </button>
       </div>
       
-      {/* Settings Controls */}
+      {/* Row 2: Speed Controls (Clean, non-overlapping row) */}
       <div style={{
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
         gap: '10px',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        width: '100%'
+        width: '100%',
+        alignItems: 'center'
       }}>
-        {/* Generous, finger-friendly slider width for mobile devices */}
-        {settings.ttsEnabled ? (
+        {/* Visual WPM Speed Control */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '13px',
+          whiteSpace: 'nowrap',
+          width: '100%',
+          maxWidth: '360px',
+          justifyContent: 'center'
+        }}>
+          <span style={{ minWidth: '75px', textAlign: 'left' }}>Visual WPM: <strong>{settings.wpm}</strong></span>
+          <button onClick={() => changeWpm(-10)} style={smallBtnStyle} title="Decrease WPM by 10">−</button>
+          <input
+            type="range"
+            min={50}
+            max={1000}
+            step={10}
+            value={settings.wpm}
+            onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
+            style={{ flex: 1, accentColor: settings.focusColor }}
+          />
+          <button onClick={() => changeWpm(10)} style={smallBtnStyle} title="Increase WPM by 10">+</button>
+        </div>
+
+        {/* Independent Voice Audio Speed Control (Only when Audio is Enabled) */}
+        {settings.ttsEnabled && (
           <div style={{
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
             gap: '8px',
             fontSize: '13px',
             whiteSpace: 'nowrap',
-            flex: '1 1 200px',
-            maxWidth: '340px',
-            minWidth: '180px'
+            width: '100%',
+            maxWidth: '360px',
+            justifyContent: 'center'
           }}>
-            <span style={{ minWidth: '95px' }}>Voice Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
+            <span style={{ minWidth: '75px', textAlign: 'left' }}>Voice Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
             <button onClick={() => changeTtsRate(-0.1)} style={smallBtnStyle} title="Decrease Voice Speed by 0.1x">−</button>
             <input
               type="range"
@@ -185,36 +209,22 @@ export const Controls: React.FC<Props> = ({
               step={0.1}
               value={settings.ttsRate}
               onChange={(e) => onSettingsChange({ ttsRate: parseFloat(e.target.value) })}
-              style={{ flex: 1, minWidth: '100px', accentColor: settings.focusColor }}
+              style={{ flex: 1, accentColor: '#10b981' }}
             />
             <button onClick={() => changeTtsRate(0.1)} style={smallBtnStyle} title="Increase Voice Speed by 0.1x">+</button>
           </div>
-        ) : (
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '13px',
-            whiteSpace: 'nowrap',
-            flex: '1 1 200px',
-            maxWidth: '340px',
-            minWidth: '180px'
-          }}>
-            <span style={{ minWidth: '70px' }}>WPM: <strong>{settings.wpm}</strong></span>
-            <button onClick={() => changeWpm(-10)} style={smallBtnStyle} title="Decrease WPM by 10">−</button>
-            <input
-              type="range"
-              min={50}
-              max={1000}
-              step={10}
-              value={settings.wpm}
-              onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
-              style={{ flex: 1, minWidth: '100px', accentColor: settings.focusColor }}
-            />
-            <button onClick={() => changeWpm(10)} style={smallBtnStyle} title="Increase WPM by 10">+</button>
-          </div>
         )}
-        
+      </div>
+
+      {/* Row 3: Dropdowns (Theme, Mode, Voice Settings) */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        width: '100%'
+      }}>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px', whiteSpace: 'nowrap' }}>
           Theme:
           <select
@@ -241,7 +251,6 @@ export const Controls: React.FC<Props> = ({
           </select>
         </label>
 
-        {/* TTS Voice Settings Toggle */}
         <button
           onClick={() => setShowTtsPanel(!showTtsPanel)}
           style={{
