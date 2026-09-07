@@ -53,19 +53,12 @@ export function isScannedPlaceholder(text: string): boolean {
   );
 }
 
-export function calculateRateFromWpm(wpm: number): number {
-  // Baseline: ~160 WPM = 1.0x rate
-  const rate = wpm / 160;
-  return Math.min(Math.max(rate, 0.5), 3.5);
-}
-
 export function speakSentence(
   sentenceText: string,
   options: {
     voiceURI?: string;
     pitch?: number;
     rate?: number;
-    wpm?: number;
     onWordBoundary?: (wordCharIndex: number) => void;
     onEnd?: () => void;
     onError?: () => void;
@@ -93,14 +86,7 @@ export function speakSentence(
   }
 
   utterance.pitch = options.pitch ?? 1.0;
-  
-  if (options.rate !== undefined && options.rate !== 1.0) {
-    utterance.rate = options.rate;
-  } else if (options.wpm) {
-    utterance.rate = calculateRateFromWpm(options.wpm);
-  } else {
-    utterance.rate = 1.0;
-  }
+  utterance.rate = options.rate ?? 1.0;
 
   if (options.onWordBoundary) {
     utterance.onboundary = (event) => {
@@ -120,54 +106,6 @@ export function speakSentence(
 
   window.speechSynthesis.speak(utterance);
   return utterance;
-}
-
-export function speakWord(
-  wordText: string,
-  options: {
-    voiceURI?: string;
-    pitch?: number;
-    rate?: number;
-    wpm?: number;
-    onEnd?: () => void;
-  }
-) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return;
-  }
-
-  window.speechSynthesis.cancel();
-
-  if (!wordText.trim() || isScannedPlaceholder(wordText)) {
-    if (options.onEnd) options.onEnd();
-    return;
-  }
-
-  const utterance = new SpeechSynthesisUtterance(wordText);
-  const voices = getAvailableVoices();
-
-  if (options.voiceURI) {
-    const selectedVoice = voices.find(v => v.voiceURI === options.voiceURI);
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
-  }
-
-  utterance.pitch = options.pitch ?? 1.0;
-  
-  if (options.rate !== undefined && options.rate !== 1.0) {
-    utterance.rate = options.rate;
-  } else if (options.wpm) {
-    utterance.rate = calculateRateFromWpm(options.wpm);
-  } else {
-    utterance.rate = 1.0;
-  }
-
-  if (options.onEnd) {
-    utterance.onend = options.onEnd;
-  }
-
-  window.speechSynthesis.speak(utterance);
 }
 
 export function stopSpeech() {

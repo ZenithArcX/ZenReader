@@ -84,6 +84,11 @@ export const Controls: React.FC<Props> = ({
     onSettingsChange({ wpm: nextWpm });
   };
 
+  const changeTtsRate = (delta: number) => {
+    const nextRate = Math.min(Math.max(parseFloat((settings.ttsRate + delta).toFixed(1)), 0.5), 3.0);
+    onSettingsChange({ ttsRate: nextRate });
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -154,21 +159,38 @@ export const Controls: React.FC<Props> = ({
         justifyContent: 'center',
         width: '100%'
       }}>
-        {/* WPM Control with - / + Buttons */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-          <span>WPM: <strong>{settings.wpm}</strong></span>
-          <button onClick={() => changeWpm(-10)} style={smallBtnStyle} title="Decrease WPM by 10">−</button>
-          <input
-            type="range"
-            min={50}
-            max={1000}
-            step={10}
-            value={settings.wpm}
-            onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
-            style={{ width: '70px', accentColor: settings.focusColor }}
-          />
-          <button onClick={() => changeWpm(10)} style={smallBtnStyle} title="Increase WPM by 10">+</button>
-        </div>
+        {/* If Audio is ON -> Use Voice Speed Meter. If Audio is OFF -> Use WPM Meter */}
+        {settings.ttsEnabled ? (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+            <span>Voice Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
+            <button onClick={() => changeTtsRate(-0.1)} style={smallBtnStyle} title="Decrease Voice Speed by 0.1x">−</button>
+            <input
+              type="range"
+              min={0.5}
+              max={3.0}
+              step={0.1}
+              value={settings.ttsRate}
+              onChange={(e) => onSettingsChange({ ttsRate: parseFloat(e.target.value) })}
+              style={{ width: '70px', accentColor: settings.focusColor }}
+            />
+            <button onClick={() => changeTtsRate(0.1)} style={smallBtnStyle} title="Increase Voice Speed by 0.1x">+</button>
+          </div>
+        ) : (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+            <span>WPM: <strong>{settings.wpm}</strong></span>
+            <button onClick={() => changeWpm(-10)} style={smallBtnStyle} title="Decrease WPM by 10">−</button>
+            <input
+              type="range"
+              min={50}
+              max={1000}
+              step={10}
+              value={settings.wpm}
+              onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
+              style={{ width: '70px', accentColor: settings.focusColor }}
+            />
+            <button onClick={() => changeWpm(10)} style={smallBtnStyle} title="Increase WPM by 10">+</button>
+          </div>
+        )}
         
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px', whiteSpace: 'nowrap' }}>
           Theme:
@@ -196,7 +218,7 @@ export const Controls: React.FC<Props> = ({
           </select>
         </label>
 
-        {/* TTS Settings Modal Toggle */}
+        {/* TTS Voice Settings Toggle */}
         <button
           onClick={() => setShowTtsPanel(!showTtsPanel)}
           style={{
@@ -226,14 +248,14 @@ export const Controls: React.FC<Props> = ({
           marginTop: '4px'
         }}>
           <div style={{ fontSize: '12px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>🎙️ Text-to-Speech Voice Settings</span>
+            <span>🎙️ Voice Configuration</span>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={settings.ttsEnabled}
                 onChange={(e) => onSettingsChange({ ttsEnabled: e.target.checked })}
               />
-              <span>Enable Audio</span>
+              <span>Audio Mode</span>
             </label>
           </div>
 

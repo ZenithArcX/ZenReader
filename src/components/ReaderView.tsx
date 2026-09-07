@@ -214,7 +214,6 @@ export const ReaderView: React.FC<Props> = ({
         voiceURI: settings.ttsVoiceURI,
         pitch: settings.ttsPitch,
         rate: settings.ttsRate,
-        wpm: settings.wpm,
         onWordBoundary: (charIndex) => {
           if (!sentence || !sentence.words) return;
           let accumLen = 0;
