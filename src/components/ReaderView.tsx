@@ -28,36 +28,45 @@ export const ReaderView: React.FC<Props> = ({
   const [sentenceIdx, setSentenceIdx] = useState(initialProgress.currentSentence);
   const [wordIdx, setWordIdx] = useState(initialProgress.currentWord);
   const [showPageModal, setShowPageModal] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const timeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleFSChange = () => {
+      setIsFullscreen(!!window.document.fullscreenElement);
+    };
+    window.document.addEventListener('fullscreenchange', handleFSChange);
+    return () => window.document.removeEventListener('fullscreenchange', handleFSChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!window.document.fullscreenElement) {
+      window.document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      window.document.exitFullscreen().catch(() => {});
+    }
+  };
   
   const page = document.pages[pageIdx];
   const sentence = page?.sentences[sentenceIdx];
   
-  // Calculate total progress
-  // Calculate total progress
-  
-  // Actually tracking overall sentence count is harder since we only have page indices
-  // We'll approximate or pre-calculate absolute sentence index.
-  // For simplicity, we just show Page and Sentence inside page.
-  
   const handleNext = () => {
     if (!page || !sentence) return false;
     
-    // Move to next word in current sentence
     if (wordIdx + 1 < sentence.words.length) {
       setWordIdx(w => w + 1);
       return true;
     }
     
-    // Move to next sentence in current page
     if (sentenceIdx + 1 < page.sentences.length) {
       setSentenceIdx(s => s + 1);
       setWordIdx(0);
       return true;
     }
     
-    // Move to next page
     if (pageIdx + 1 < document.pages.length) {
       setPageIdx(p => p + 1);
       setSentenceIdx(0);
@@ -65,19 +74,17 @@ export const ReaderView: React.FC<Props> = ({
       return true;
     }
     
-    return false; // end of document
+    return false;
   };
   
   const handlePrev = () => {
     if (!page || !sentence) return;
     
-    // Move to prev word in current sentence
     if (wordIdx > 0) {
       setWordIdx(w => w - 1);
       return;
     }
     
-    // Move to prev sentence
     if (sentenceIdx > 0) {
       const prevSentence = page.sentences[sentenceIdx - 1];
       setSentenceIdx(s => s - 1);
@@ -85,7 +92,6 @@ export const ReaderView: React.FC<Props> = ({
       return;
     }
     
-    // Move to prev page
     if (pageIdx > 0) {
       const prevPage = document.pages[pageIdx - 1];
       const lastSentence = prevPage?.sentences[prevPage.sentences.length - 1];
@@ -155,14 +161,18 @@ export const ReaderView: React.FC<Props> = ({
           break;
         case 'Escape':
           e.preventDefault();
-          onClose();
+          if (isFocusMode) {
+            setIsFocusMode(false);
+          } else {
+            onClose();
+          }
           break;
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pageIdx, sentenceIdx, wordIdx, settings.readingMode, document]);
+  }, [pageIdx, sentenceIdx, wordIdx, settings.readingMode, document, isFocusMode]);
   
   // Save progress
   useEffect(() => {
@@ -172,7 +182,6 @@ export const ReaderView: React.FC<Props> = ({
   // Playback loop
   useEffect(() => {
     if (isPlaying) {
-      // WPM = words per minute -> 60000 / WPM ms per word
       const msPerWord = 60000 / settings.wpm;
       
       timeoutRef.current = window.setTimeout(() => {
@@ -198,8 +207,51 @@ export const ReaderView: React.FC<Props> = ({
       minHeight: '100vh',
       backgroundColor: currentTheme.bg,
       color: currentTheme.text,
-      transition: 'background-color 0.2s, color 0.2s'
+      transition: 'background-color 0.2s, color 0.2s',
+      position: 'relative',
+      userSelect: 'none'
     }}>
+      {/* Mistouch Lock Overlay */}
+      {isLocked && (
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.2)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            paddingTop: '20px'
+          }}
+        >
+          <button
+            onClick={() => setIsLocked(false)}
+            style={{
+              padding: '10px 24px',
+              borderRadius: '30px',
+              border: '2px solid #ef4444',
+              background: '#ef4444',
+              color: '#ffffff',
+              fontSize: '15px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            🔒 Mistouch Lock Active — Tap to Unlock
+          </button>
+        </div>
+      )}
+
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -209,7 +261,16 @@ export const ReaderView: React.FC<Props> = ({
         padding: '24px',
         boxSizing: 'border-box'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        {/* Top Bar (Hidden in Focus Mode) */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '24px',
+          opacity: isFocusMode ? 0 : 1,
+          pointerEvents: isFocusMode ? 'none' : 'auto',
+          transition: 'opacity 0.25s ease'
+        }}>
           <h2 style={{ margin: 0, fontSize: '1.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '40%' }}>{document.title}</h2>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <button
@@ -245,14 +306,25 @@ export const ReaderView: React.FC<Props> = ({
           </div>
         </div>
         
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: `${settings.fontSize}px`,
-          lineHeight: settings.lineHeight
-        }}>
+        {/* Main Reading Center (Tap toggles focus mode) */}
+        <div 
+          onClick={() => {
+            if (!isLocked) setIsFocusMode(!isFocusMode);
+          }}
+          title="Tap anywhere to hide/show navigation controls"
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: `${settings.fontSize}px`,
+            lineHeight: settings.lineHeight,
+            cursor: 'pointer',
+            padding: '20px',
+            borderRadius: '12px',
+            transition: 'background 0.2s ease'
+          }}
+        >
           {settings.readingMode === 'word' ? (
             <div style={{ fontSize: '2em' }}>
                {sentence.words[wordIdx] && (
@@ -281,14 +353,25 @@ export const ReaderView: React.FC<Props> = ({
           )}
         </div>
         
-        <Controls 
-          isPlaying={isPlaying}
-          onPlayPause={() => setIsPlaying(!isPlaying)}
-          onNext={handleNext}
-          onPrev={handlePrev}
-          settings={settings}
-          onSettingsChange={onSettingsChange}
-        />
+        {/* Bottom Controls Bar (Hidden in Focus Mode) */}
+        <div style={{
+          opacity: isFocusMode ? 0 : 1,
+          pointerEvents: isFocusMode ? 'none' : 'auto',
+          transition: 'opacity 0.25s ease'
+        }}>
+          <Controls 
+            isPlaying={isPlaying}
+            onPlayPause={() => setIsPlaying(!isPlaying)}
+            onNext={handleNext}
+            onPrev={handlePrev}
+            settings={settings}
+            onSettingsChange={onSettingsChange}
+            isLocked={isLocked}
+            onToggleLock={() => setIsLocked(!isLocked)}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
+          />
+        </div>
       </div>
 
       {showPageModal && (
