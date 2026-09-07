@@ -197,10 +197,13 @@ export const ReaderView: React.FC<Props> = ({
   }, [isPlaying, pageIdx, sentenceIdx, wordIdx, settings.wpm, settings.readingMode]);
   
   if (!page || !sentence) {
-    return <div>Finished!</div>;
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Finished Reading!</div>;
   }
   
   const currentTheme = themes[settings.theme] || themes.light;
+
+  // Effective focus mode: enabled either manually via tap OR when mistouch lock is active!
+  const hideControls = isFocusMode || isLocked;
 
   return (
     <div style={{
@@ -209,47 +212,56 @@ export const ReaderView: React.FC<Props> = ({
       color: currentTheme.text,
       transition: 'background-color 0.2s, color 0.2s',
       position: 'relative',
-      userSelect: 'none'
+      userSelect: 'none',
+      overflow: 'hidden'
     }}>
-      {/* Mistouch Lock Overlay */}
+      {/* Transparent Mistouch Lock Touch Blocker & Subtle Non-distracting Unlock Pill */}
       {isLocked && (
-        <div 
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 9999,
-            background: 'rgba(0,0,0,0.2)',
-            backdropFilter: 'blur(2px)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            paddingTop: '20px'
-          }}
-        >
-          <button
-            onClick={() => setIsLocked(false)}
+        <>
+          <div 
             style={{
-              padding: '10px 24px',
-              borderRadius: '30px',
-              border: '2px solid #ef4444',
-              background: '#ef4444',
-              color: '#ffffff',
-              fontSize: '15px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9998,
+              background: 'transparent',
+              pointerEvents: 'all'
             }}
-          >
-            🔒 Mistouch Lock Active — Tap to Unlock
-          </button>
-        </div>
+          />
+          <div style={{
+            position: 'fixed',
+            top: '12px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            pointerEvents: 'all'
+          }}>
+            <button
+              onClick={() => setIsLocked(false)}
+              style={{
+                padding: '5px 14px',
+                borderRadius: '20px',
+                border: `1px solid ${currentTheme.border}`,
+                background: currentTheme.controlBg,
+                color: currentTheme.subtext,
+                fontSize: '12px',
+                cursor: 'pointer',
+                opacity: 0.65,
+                transition: 'opacity 0.2s ease, transform 0.2s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.65')}
+            >
+              🔒 Tap to unlock
+            </button>
+          </div>
+        </>
       )}
 
       <div style={{
@@ -258,50 +270,66 @@ export const ReaderView: React.FC<Props> = ({
         height: '100vh',
         maxWidth: settings.readingWidth,
         margin: '0 auto',
-        padding: '24px',
+        padding: '12px 16px',
         boxSizing: 'border-box'
       }}>
-        {/* Top Bar (Hidden in Focus Mode) */}
+        {/* Top Header Bar (Hidden in Focus/Locked Mode) */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '24px',
-          opacity: isFocusMode ? 0 : 1,
-          pointerEvents: isFocusMode ? 'none' : 'auto',
-          transition: 'opacity 0.25s ease'
+          gap: '8px',
+          marginBottom: '12px',
+          opacity: hideControls ? 0 : 1,
+          pointerEvents: hideControls ? 'none' : 'auto',
+          transition: 'opacity 0.25s ease',
+          flexWrap: 'nowrap'
         }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '40%' }}>{document.title}</h2>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <h2 style={{
+            margin: 0,
+            fontSize: 'clamp(0.95rem, 3.5vw, 1.25rem)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: '35%'
+          }}>
+            {document.title}
+          </h2>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
             <button
               onClick={() => {
                 setIsPlaying(false);
                 setShowPageModal(true);
               }}
               style={{
-                padding: '6px 14px',
+                padding: '5px 10px',
                 borderRadius: '6px',
                 border: `1px solid ${currentTheme.border}`,
                 background: currentTheme.controlBg,
                 color: currentTheme.text,
                 cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: '600'
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                whiteSpace: 'nowrap'
               }}
             >
-              📖 Page {page.pageNumber} / {document.pages.length} (Jump)
+              📖 P.{page.pageNumber}/{document.pages.length}
             </button>
-            <span style={{ color: currentTheme.subtext, fontSize: '0.85rem' }}>
-              Sentence {sentenceIdx + 1} / {page.sentences.length}
+
+            <span style={{ color: currentTheme.subtext, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+              S.{sentenceIdx + 1}/{page.sentences.length}
             </span>
+
             <button onClick={onClose} style={{
-              padding: '6px 14px',
+              padding: '5px 10px',
               borderRadius: '6px',
               border: `1px solid ${currentTheme.border}`,
               background: currentTheme.btnBg,
               color: currentTheme.btnText,
               cursor: 'pointer',
-              fontSize: '0.85rem'
+              fontSize: '0.8rem',
+              whiteSpace: 'nowrap'
             }}>Close</button>
           </div>
         </div>
@@ -317,22 +345,31 @@ export const ReaderView: React.FC<Props> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: `${settings.fontSize}px`,
+            fontSize: `clamp(18px, ${settings.fontSize}px, 48px)`,
             lineHeight: settings.lineHeight,
             cursor: 'pointer',
-            padding: '20px',
+            padding: '12px',
             borderRadius: '12px',
-            transition: 'background 0.2s ease'
+            transition: 'background 0.2s ease',
+            overflow: 'hidden'
           }}
         >
           {settings.readingMode === 'word' ? (
-            <div style={{ fontSize: '2em' }}>
+            <div style={{ fontSize: '1.8em', maxWidth: '100%', textAlign: 'center' }}>
                {sentence.words[wordIdx] && (
                  <FocusWord word={sentence.words[wordIdx].text} focusColor={settings.focusColor} />
                )}
             </div>
           ) : (
-            <div style={{ textAlign: 'left', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            <div style={{
+              textAlign: 'left',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '6px 8px',
+              alignItems: 'center',
+              justifyContent: 'center',
+              maxWidth: '100%'
+            }}>
               {sentence.words.map((w, i) => {
                 const isActive = i === wordIdx;
                 return (
@@ -340,7 +377,7 @@ export const ReaderView: React.FC<Props> = ({
                     opacity: isActive ? 1 : 0.35,
                     background: isActive ? currentTheme.controlBg : 'transparent',
                     border: `1px solid ${isActive ? currentTheme.border : 'transparent'}`,
-                    padding: '3px 7px',
+                    padding: '2px 6px',
                     borderRadius: '5px',
                     transition: 'opacity 0.12s ease, background 0.12s ease',
                     display: 'inline-block'
@@ -353,11 +390,13 @@ export const ReaderView: React.FC<Props> = ({
           )}
         </div>
         
-        {/* Bottom Controls Bar (Hidden in Focus Mode) */}
+        {/* Bottom Controls Bar (Hidden in Focus/Locked Mode) */}
         <div style={{
-          opacity: isFocusMode ? 0 : 1,
-          pointerEvents: isFocusMode ? 'none' : 'auto',
-          transition: 'opacity 0.25s ease'
+          opacity: hideControls ? 0 : 1,
+          pointerEvents: hideControls ? 'none' : 'auto',
+          transition: 'opacity 0.25s ease',
+          width: '100%',
+          boxSizing: 'border-box'
         }}>
           <Controls 
             isPlaying={isPlaying}
