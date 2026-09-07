@@ -21,6 +21,10 @@ export interface AppSettings {
   focusColor: string;
   wpm: number;
   readingMode: 'sentence' | 'word';
+  ttsEnabled: boolean;
+  ttsVoiceURI: string;
+  ttsPitch: number;
+  ttsRate: number;
 }
 
 const DB_NAME = 'ZenReaderDB';
@@ -99,6 +103,10 @@ export const defaultSettings: AppSettings = {
   focusColor: '#ff0000',
   wpm: 250,
   readingMode: 'sentence',
+  ttsEnabled: false,
+  ttsVoiceURI: '',
+  ttsPitch: 1.0,
+  ttsRate: 1.0
 };
 
 export async function saveSettings(settings: AppSettings): Promise<void> {

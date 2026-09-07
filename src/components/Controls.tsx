@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppSettings } from '../storage/db';
 import { themes } from '../theme/colors';
+import { subscribeVoices } from '../utils/tts';
 
 interface Props {
   isPlaying: boolean;
@@ -27,6 +28,14 @@ export const Controls: React.FC<Props> = ({
   isFullscreen,
   onToggleFullscreen
 }) => {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [showTtsPanel, setShowTtsPanel] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = subscribeVoices((v) => setVoices(v));
+    return () => unsubscribe();
+  }, []);
+
   const currentTheme = themes[settings.theme] || themes.light;
 
   const btnStyle: React.CSSProperties = {
@@ -72,7 +81,7 @@ export const Controls: React.FC<Props> = ({
       width: '100%',
       boxSizing: 'border-box'
     }}>
-      {/* Action Buttons Row */}
+      {/* Primary Action Buttons */}
       <div style={{
         display: 'flex',
         gap: '8px',
@@ -87,10 +96,22 @@ export const Controls: React.FC<Props> = ({
         <button onClick={onNext} style={btnStyle} title="Next word/sentence">Next</button>
         
         <button 
+          onClick={() => onSettingsChange({ ttsEnabled: !settings.ttsEnabled })} 
+          style={{ 
+            ...btnStyle, 
+            background: settings.ttsEnabled ? currentTheme.btnBg : currentTheme.btnBg,
+            color: settings.ttsEnabled ? '#10b981' : currentTheme.btnText,
+            borderColor: settings.ttsEnabled ? '#10b981' : currentTheme.border
+          }}
+          title="Toggle Read Aloud Speech (TTS)"
+        >
+          {settings.ttsEnabled ? '🔊 Audio ON' : '🔇 Audio OFF'}
+        </button>
+
+        <button 
           onClick={onToggleLock} 
           style={{ 
             ...btnStyle, 
-            background: isLocked ? currentTheme.btnBg : currentTheme.btnBg,
             color: isLocked ? '#ef4444' : currentTheme.btnText,
             borderColor: isLocked ? '#ef4444' : currentTheme.border
           }}
@@ -108,7 +129,7 @@ export const Controls: React.FC<Props> = ({
         </button>
       </div>
       
-      {/* Settings Row */}
+      {/* Settings Controls */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -126,7 +147,7 @@ export const Controls: React.FC<Props> = ({
             step={10}
             value={settings.wpm}
             onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
-            style={{ width: '85px', accentColor: settings.focusColor }}
+            style={{ width: '80px', accentColor: settings.focusColor }}
           />
         </label>
         
@@ -155,7 +176,93 @@ export const Controls: React.FC<Props> = ({
             <option value="word">Word</option>
           </select>
         </label>
+
+        {/* TTS Settings Modal Toggle */}
+        <button
+          onClick={() => setShowTtsPanel(!showTtsPanel)}
+          style={{
+            ...btnStyle,
+            flex: '0 0 auto',
+            fontSize: '12px',
+            padding: '4px 8px'
+          }}
+          title="Configure TTS Voice and Pitch"
+        >
+          ⚙️ Voice Settings
+        </button>
       </div>
+
+      {/* Expanded Voice & Pitch Settings Panel */}
+      {(showTtsPanel || settings.ttsEnabled) && (
+        <div style={{
+          width: '100%',
+          padding: '10px 12px',
+          background: currentTheme.cardBg,
+          borderRadius: '8px',
+          border: `1px solid ${currentTheme.border}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          boxSizing: 'border-box',
+          marginTop: '4px'
+        }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>🎙️ Text-to-Speech Voice Settings</span>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={settings.ttsEnabled}
+                onChange={(e) => onSettingsChange({ ttsEnabled: e.target.checked })}
+              />
+              <span>Enable Audio</span>
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 180px', fontSize: '12px' }}>
+              <span>Voice:</span>
+              <select
+                value={settings.ttsVoiceURI}
+                onChange={(e) => onSettingsChange({ ttsVoiceURI: e.target.value })}
+                style={selectStyle}
+              >
+                <option value="">System Default Voice</option>
+                {voices.map((v) => (
+                  <option key={v.voiceURI} value={v.voiceURI}>
+                    {v.name} ({v.lang})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 110px', fontSize: '12px' }}>
+              <span>Pitch: <strong>{settings.ttsPitch.toFixed(1)}x</strong></span>
+              <input
+                type="range"
+                min={0.5}
+                max={1.5}
+                step={0.1}
+                value={settings.ttsPitch}
+                onChange={(e) => onSettingsChange({ ttsPitch: parseFloat(e.target.value) })}
+                style={{ accentColor: settings.focusColor }}
+              />
+            </label>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 110px', fontSize: '12px' }}>
+              <span>Speech Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
+              <input
+                type="range"
+                min={0.5}
+                max={2.0}
+                step={0.1}
+                value={settings.ttsRate}
+                onChange={(e) => onSettingsChange({ ttsRate: parseFloat(e.target.value) })}
+                style={{ accentColor: settings.focusColor }}
+              />
+            </label>
+          </div>
+        </div>
+      )}
 
       <div style={{ fontSize: '11px', opacity: 0.65, textAlign: 'center' }}>
         💡 <em>Tap center text area to hide controls</em>

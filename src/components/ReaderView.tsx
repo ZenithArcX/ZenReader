@@ -5,6 +5,7 @@ import { AppSettings, ShelfItem } from '../storage/db';
 import { Controls } from './Controls';
 import { themes } from '../theme/colors';
 import { PageSelectorModal } from './PageSelectorModal';
+import { speakText, stopSpeech } from '../utils/tts';
 
 interface Props {
   document: ReaderDocument;
@@ -130,6 +131,7 @@ export const ReaderView: React.FC<Props> = ({
     const success = handleNext();
     if (!success) {
       setIsPlaying(false);
+      stopSpeech();
     }
   };
   
@@ -141,7 +143,10 @@ export const ReaderView: React.FC<Props> = ({
       switch (e.key) {
         case ' ':
           e.preventDefault();
-          setIsPlaying(p => !p);
+          setIsPlaying(p => {
+            if (p) stopSpeech();
+            return !p;
+          });
           break;
         case 'ArrowRight':
           e.preventDefault();
@@ -164,6 +169,7 @@ export const ReaderView: React.FC<Props> = ({
           if (isFocusMode) {
             setIsFocusMode(false);
           } else {
+            stopSpeech();
             onClose();
           }
           break;
@@ -179,14 +185,27 @@ export const ReaderView: React.FC<Props> = ({
     onProgressUpdate({ currentPage: pageIdx, currentSentence: sentenceIdx, currentWord: wordIdx });
   }, [pageIdx, sentenceIdx, wordIdx]);
   
-  // Playback loop
+  // Playback & TTS loop
   useEffect(() => {
     if (isPlaying) {
+      // Speak current word or sentence if TTS is enabled
+      if (settings.ttsEnabled && sentence) {
+        const textToSpeak = sentence.words[wordIdx]?.text;
+        if (textToSpeak) {
+          speakText(textToSpeak, {
+            voiceURI: settings.ttsVoiceURI,
+            pitch: settings.ttsPitch,
+            rate: settings.ttsRate
+          });
+        }
+      }
+
       const msPerWord = 60000 / settings.wpm;
-      
       timeoutRef.current = window.setTimeout(() => {
         advance();
       }, msPerWord);
+    } else {
+      stopSpeech();
     }
     
     return () => {
@@ -194,15 +213,18 @@ export const ReaderView: React.FC<Props> = ({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [isPlaying, pageIdx, sentenceIdx, wordIdx, settings.wpm, settings.readingMode]);
-  
+  }, [isPlaying, pageIdx, sentenceIdx, wordIdx, settings.wpm, settings.readingMode, settings.ttsEnabled, settings.ttsVoiceURI, settings.ttsPitch, settings.ttsRate]);
+
+  // Clean up speech on unmount
+  useEffect(() => {
+    return () => stopSpeech();
+  }, []);
+
   if (!page || !sentence) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Finished Reading!</div>;
   }
   
   const currentTheme = themes[settings.theme] || themes.light;
-
-  // Effective focus mode: enabled either manually via tap OR when mistouch lock is active!
   const hideControls = isFocusMode || isLocked;
 
   return (
@@ -300,6 +322,7 @@ export const ReaderView: React.FC<Props> = ({
             <button
               onClick={() => {
                 setIsPlaying(false);
+                stopSpeech();
                 setShowPageModal(true);
               }}
               style={{
@@ -321,7 +344,10 @@ export const ReaderView: React.FC<Props> = ({
               S.{sentenceIdx + 1}/{page.sentences.length}
             </span>
 
-            <button onClick={onClose} style={{
+            <button onClick={() => {
+              stopSpeech();
+              onClose();
+            }} style={{
               padding: '5px 10px',
               borderRadius: '6px',
               border: `1px solid ${currentTheme.border}`,
@@ -400,7 +426,12 @@ export const ReaderView: React.FC<Props> = ({
         }}>
           <Controls 
             isPlaying={isPlaying}
-            onPlayPause={() => setIsPlaying(!isPlaying)}
+            onPlayPause={() => {
+              setIsPlaying(p => {
+                if (p) stopSpeech();
+                return !p;
+              });
+            }}
             onNext={handleNext}
             onPrev={handlePrev}
             settings={settings}
