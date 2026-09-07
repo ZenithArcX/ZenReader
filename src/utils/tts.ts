@@ -54,10 +54,63 @@ export function isScannedPlaceholder(text: string): boolean {
 }
 
 export function calculateRateFromWpm(wpm: number): number {
-  // Baseline: 150 WPM = 1.0x rate.
-  // Boost speech rate slightly so audio utterance finishes BEFORE the next visual WPM tick
   const rate = (wpm / 150) * 1.15;
   return Math.min(Math.max(rate, 0.6), 4.0);
+}
+
+export function speakSentence(
+  sentenceText: string,
+  options: {
+    voiceURI?: string;
+    pitch?: number;
+    rate?: number;
+    onWordBoundary?: (wordCharIndex: number) => void;
+    onEnd?: () => void;
+    onError?: () => void;
+  }
+): SpeechSynthesisUtterance | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return null;
+  }
+
+  window.speechSynthesis.cancel();
+
+  if (!sentenceText.trim() || isScannedPlaceholder(sentenceText)) {
+    if (options.onEnd) options.onEnd();
+    return null;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(sentenceText);
+  const voices = getAvailableVoices();
+
+  if (options.voiceURI) {
+    const selectedVoice = voices.find(v => v.voiceURI === options.voiceURI);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+  }
+
+  utterance.pitch = options.pitch ?? 1.0;
+  utterance.rate = options.rate ?? 1.0;
+
+  if (options.onWordBoundary) {
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        options.onWordBoundary!(event.charIndex);
+      }
+    };
+  }
+
+  if (options.onEnd) {
+    utterance.onend = () => options.onEnd!();
+  }
+
+  if (options.onError) {
+    utterance.onerror = () => options.onError!();
+  }
+
+  window.speechSynthesis.speak(utterance);
+  return utterance;
 }
 
 export function speakWord(

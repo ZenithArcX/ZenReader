@@ -5,7 +5,7 @@ import { AppSettings, ShelfItem } from '../storage/db';
 import { Controls } from './Controls';
 import { themes } from '../theme/colors';
 import { PageSelectorModal } from './PageSelectorModal';
-import { speakWord, stopSpeech, isScannedPlaceholder, calculateRateFromWpm } from '../utils/tts';
+import { speakSentence, speakWord, stopSpeech, isScannedPlaceholder } from '../utils/tts';
 
 interface Props {
   document: ReaderDocument;
@@ -192,14 +192,14 @@ export const ReaderView: React.FC<Props> = ({
     onProgressUpdate({ currentPage: pageIdx, currentSentence: sentenceIdx, currentWord: wordIdx });
   }, [pageIdx, sentenceIdx, wordIdx]);
   
-  // Playback Loop (Unified WPM timing for both Audio ON and Audio OFF)
+  // Playback & Speech Engine Loop
   useEffect(() => {
     if (!isPlaying || !sentence) {
       stopSpeech();
       return;
     }
 
-    // Skip scanned placeholder strings automatically
+    // Auto-skip scanned page placeholders without reading or halting
     if (isScannedPlaceholder(sentence.text)) {
       const timer = setTimeout(() => {
         handleNextSentence();
@@ -207,44 +207,76 @@ export const ReaderView: React.FC<Props> = ({
       return () => clearTimeout(timer);
     }
 
-    // Speak current word if audio is enabled
     if (settings.ttsEnabled) {
-      const currentWordObj = sentence.words[wordIdx];
-      if (currentWordObj && currentWordObj.text) {
-        const ttsRate = settings.ttsRate !== 1.0 
-          ? settings.ttsRate 
-          : calculateRateFromWpm(settings.wpm);
-        
-        speakWord(currentWordObj.text, {
+      if (settings.readingMode === 'sentence') {
+        // Sentence Mode with Audio ON: Speak full sentence smoothly like a natural sentence!
+        speakSentence(sentence.text, {
           voiceURI: settings.ttsVoiceURI,
           pitch: settings.ttsPitch,
-          rate: ttsRate
+          rate: settings.ttsRate,
+          onWordBoundary: (charIndex: number) => {
+            if (!sentence || !sentence.words) return;
+            let accumLen = 0;
+            for (let i = 0; i < sentence.words.length; i++) {
+              const wordLen = sentence.words[i].text.length;
+              if (charIndex >= accumLen && charIndex <= accumLen + wordLen + 2) {
+                setWordIdx(i);
+                break;
+              }
+              accumLen += wordLen + 1;
+            }
+          },
+          onEnd: () => {
+            handleNextSentence();
+          }
         });
+      } else {
+        // Word Mode with Audio ON: Speak word by word at Voice Speed
+        const currentWordObj = sentence.words[wordIdx];
+        if (currentWordObj && currentWordObj.text) {
+          speakWord(currentWordObj.text, {
+            voiceURI: settings.ttsVoiceURI,
+            pitch: settings.ttsPitch,
+            rate: settings.ttsRate
+          });
+        }
+
+        // Timer interval driven by Voice Speed (ttsRate)
+        const msPerWord = Math.max(150, Math.round(400 / settings.ttsRate));
+        timeoutRef.current = window.setTimeout(() => {
+          advance();
+        }, msPerWord);
+
+        return () => {
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+        };
       }
+    } else {
+      // Audio OFF: Pure visual RSVP WPM timer loop
+      const msPerWord = Math.round(60000 / settings.wpm);
+      timeoutRef.current = window.setTimeout(() => {
+        advance();
+      }, msPerWord);
+
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
     }
-
-    // Visual WPM timer tick
-    const msPerWord = 60000 / settings.wpm;
-    timeoutRef.current = window.setTimeout(() => {
-      advance();
-    }, msPerWord);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
   }, [
     isPlaying,
     pageIdx,
     sentenceIdx,
     wordIdx,
-    settings.wpm,
     settings.readingMode,
     settings.ttsEnabled,
     settings.ttsVoiceURI,
     settings.ttsPitch,
-    settings.ttsRate
+    settings.ttsRate,
+    settings.wpm
   ]);
 
   // Clean up speech on unmount

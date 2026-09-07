@@ -98,7 +98,7 @@ export const Controls: React.FC<Props> = ({
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      gap: '14px',
+      gap: '12px',
       alignItems: 'center',
       padding: '12px 14px',
       background: currentTheme.controlBg,
@@ -108,7 +108,7 @@ export const Controls: React.FC<Props> = ({
       width: '100%',
       boxSizing: 'border-box'
     }}>
-      {/* Row 1: Primary Action Buttons */}
+      {/* Row 1: Main Action Buttons */}
       <div style={{
         display: 'flex',
         gap: '8px',
@@ -155,41 +155,14 @@ export const Controls: React.FC<Props> = ({
         </button>
       </div>
       
-      {/* Row 2: Speed Controls (Clean, non-overlapping row) */}
+      {/* Row 2: Exclusive Speed Control (Audio ON -> Voice Speed ONLY; Audio OFF -> WPM ONLY) */}
       <div style={{
         display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
         width: '100%',
-        alignItems: 'center'
+        justifyContent: 'center'
       }}>
-        {/* Visual WPM Speed Control */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '13px',
-          whiteSpace: 'nowrap',
-          width: '100%',
-          maxWidth: '360px',
-          justifyContent: 'center'
-        }}>
-          <span style={{ minWidth: '75px', textAlign: 'left' }}>Visual WPM: <strong>{settings.wpm}</strong></span>
-          <button onClick={() => changeWpm(-10)} style={smallBtnStyle} title="Decrease WPM by 10">−</button>
-          <input
-            type="range"
-            min={50}
-            max={1000}
-            step={10}
-            value={settings.wpm}
-            onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
-            style={{ flex: 1, accentColor: settings.focusColor }}
-          />
-          <button onClick={() => changeWpm(10)} style={smallBtnStyle} title="Increase WPM by 10">+</button>
-        </div>
-
-        {/* Independent Voice Audio Speed Control (Only when Audio is Enabled) */}
-        {settings.ttsEnabled && (
+        {settings.ttsEnabled ? (
+          /* Audio ON Mode: Voice Speed ONLY */
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -200,7 +173,7 @@ export const Controls: React.FC<Props> = ({
             maxWidth: '360px',
             justifyContent: 'center'
           }}>
-            <span style={{ minWidth: '75px', textAlign: 'left' }}>Voice Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
+            <span style={{ minWidth: '95px', textAlign: 'left' }}>Voice Speed: <strong>{settings.ttsRate.toFixed(1)}x</strong></span>
             <button onClick={() => changeTtsRate(-0.1)} style={smallBtnStyle} title="Decrease Voice Speed by 0.1x">−</button>
             <input
               type="range"
@@ -212,6 +185,31 @@ export const Controls: React.FC<Props> = ({
               style={{ flex: 1, accentColor: '#10b981' }}
             />
             <button onClick={() => changeTtsRate(0.1)} style={smallBtnStyle} title="Increase Voice Speed by 0.1x">+</button>
+          </div>
+        ) : (
+          /* Audio OFF Mode: Visual WPM ONLY */
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            whiteSpace: 'nowrap',
+            width: '100%',
+            maxWidth: '360px',
+            justifyContent: 'center'
+          }}>
+            <span style={{ minWidth: '75px', textAlign: 'left' }}>Visual WPM: <strong>{settings.wpm}</strong></span>
+            <button onClick={() => changeWpm(-10)} style={smallBtnStyle} title="Decrease WPM by 10">−</button>
+            <input
+              type="range"
+              min={50}
+              max={1000}
+              step={10}
+              value={settings.wpm}
+              onChange={(e) => onSettingsChange({ wpm: parseInt(e.target.value, 10) })}
+              style={{ flex: 1, accentColor: settings.focusColor }}
+            />
+            <button onClick={() => changeWpm(10)} style={smallBtnStyle} title="Increase WPM by 10">+</button>
           </div>
         )}
       </div>
