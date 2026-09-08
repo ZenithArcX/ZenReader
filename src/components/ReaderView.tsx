@@ -55,14 +55,14 @@ export const ReaderView: React.FC<Props> = ({
   const page = document.pages[pageIdx];
   const sentence = page?.sentences[sentenceIdx];
   
-  // Step size for Visual WPM Mode: 2 words at a time in Sentence Mode, 1 word in Word Mode
-  const stepSize = settings.readingMode === 'sentence' ? 2 : 1;
+  // Step size: 1 word moves at a time
+  const stepSize = 1;
 
   const handleNext = () => {
     if (!page || !sentence) return false;
     
-    if (wordIdx + stepSize < sentence.words.length) {
-      setWordIdx(w => w + stepSize);
+    if (wordIdx + 1 < sentence.words.length) {
+      setWordIdx(w => w + 1);
       return true;
     }
     
@@ -85,15 +85,15 @@ export const ReaderView: React.FC<Props> = ({
   const handlePrev = () => {
     if (!page || !sentence) return;
     
-    if (wordIdx >= stepSize) {
-      setWordIdx(w => w - stepSize);
+    if (wordIdx > 0) {
+      setWordIdx(w => w - 1);
       return;
     }
     
     if (sentenceIdx > 0) {
       const prevSentence = page.sentences[sentenceIdx - 1];
       setSentenceIdx(s => s - 1);
-      setWordIdx(prevSentence ? Math.max(0, prevSentence.words.length - stepSize) : 0);
+      setWordIdx(prevSentence ? Math.max(0, prevSentence.words.length - 1) : 0);
       return;
     }
     
@@ -102,7 +102,7 @@ export const ReaderView: React.FC<Props> = ({
       const lastSentence = prevPage?.sentences[prevPage.sentences.length - 1];
       setPageIdx(p => p - 1);
       setSentenceIdx(prevPage ? Math.max(0, prevPage.sentences.length - 1) : 0);
-      setWordIdx(lastSentence ? Math.max(0, lastSentence.words.length - stepSize) : 0);
+      setWordIdx(lastSentence ? Math.max(0, lastSentence.words.length - 1) : 0);
     }
   };
 
@@ -238,11 +238,11 @@ export const ReaderView: React.FC<Props> = ({
       };
     } else {
       spokenSentenceKeyRef.current = '';
-      // Audio Mode OFF: Pure visual RSVP WPM timer loop
-      const msPerChunk = Math.round((60000 * stepSize) / settings.wpm);
+      // Audio Mode OFF: Pure visual RSVP WPM timer loop (1 word per tick)
+      const msPerWord = Math.round(60000 / settings.wpm);
       timeoutRef.current = window.setTimeout(() => {
         advance();
-      }, msPerChunk);
+      }, msPerWord);
 
       return () => {
         if (timeoutRef.current) {
@@ -275,9 +275,6 @@ export const ReaderView: React.FC<Props> = ({
   
   const currentTheme = themes[settings.theme] || themes.light;
   const hideControls = isFocusMode || isLocked;
-
-  // Active 2-word chunk calculation for Visual WPM Sentence Mode
-  const currentChunkIdx = Math.floor(wordIdx / 2);
 
   return (
     <div style={{
@@ -449,7 +446,7 @@ export const ReaderView: React.FC<Props> = ({
               maxWidth: '100%'
             }}>
               {sentence.words.map((w, i) => {
-                // If Audio Mode is ON, remove active word highlighting (render clean text without red letter / background pill)
+                // If Audio Mode is ON, render clean text without red letter / background pill
                 if (settings.ttsEnabled) {
                   return (
                     <span key={i} style={{ 
@@ -462,17 +459,15 @@ export const ReaderView: React.FC<Props> = ({
                   );
                 }
 
-                // If Audio Mode is OFF (Visual WPM Mode), keep 2-word phrase chunking with Guided Optical Fixation
-                const isHighlighted = Math.floor(i / 2) === currentChunkIdx;
+                // If Audio Mode is OFF (Visual WPM Mode), highlight 1 word at a time with Guided Optical Fixation
+                const isHighlighted = i === wordIdx;
                 return (
                   <span key={i} style={{ 
                     opacity: isHighlighted ? 1 : 0.28,
                     background: isHighlighted ? currentTheme.controlBg : 'transparent',
                     border: `1px solid ${isHighlighted ? currentTheme.border : 'transparent'}`,
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    transition: 'opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), background 0.22s ease, border-color 0.22s ease, transform 0.22s ease',
-                    transform: isHighlighted ? 'scale(1.04)' : 'scale(1.0)',
+                    padding: '3px 7px',
+                    borderRadius: '5px',
                     display: 'inline-block'
                   }}>
                     <FocusWord word={w.text} focusColor={settings.focusColor} />
