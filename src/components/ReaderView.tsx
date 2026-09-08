@@ -35,6 +35,7 @@ export const ReaderView: React.FC<Props> = ({
   
   const timeoutRef = useRef<number | null>(null);
   const spokenSentenceKeyRef = useRef<string>('');
+  const spokenWordKeyRef = useRef<string>('');
 
   useEffect(() => {
     const handleFSChange = () => {
@@ -159,24 +160,28 @@ export const ReaderView: React.FC<Props> = ({
           e.preventDefault();
           stopSpeech();
           spokenSentenceKeyRef.current = '';
+          spokenWordKeyRef.current = '';
           handleNext();
           break;
         case 'ArrowLeft':
           e.preventDefault();
           stopSpeech();
           spokenSentenceKeyRef.current = '';
+          spokenWordKeyRef.current = '';
           handlePrev();
           break;
         case 'ArrowDown':
           e.preventDefault();
           stopSpeech();
           spokenSentenceKeyRef.current = '';
+          spokenWordKeyRef.current = '';
           handleNextSentence();
           break;
         case 'ArrowUp':
           e.preventDefault();
           stopSpeech();
           spokenSentenceKeyRef.current = '';
+          spokenWordKeyRef.current = '';
           handlePrevSentence();
           break;
         case 'Escape':
@@ -205,6 +210,7 @@ export const ReaderView: React.FC<Props> = ({
     if (!isPlaying || !sentence) {
       stopSpeech();
       spokenSentenceKeyRef.current = '';
+      spokenWordKeyRef.current = '';
       return;
     }
 
@@ -217,27 +223,59 @@ export const ReaderView: React.FC<Props> = ({
     }
 
     if (settings.ttsEnabled) {
-      // Audio Mode ON: Speak full sentence fluently as a natural continuous sentence!
-      const currentSentenceKey = `${pageIdx}-${sentenceIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
-      
-      if (spokenSentenceKeyRef.current !== currentSentenceKey) {
-        spokenSentenceKeyRef.current = currentSentenceKey;
-        speakSentence(sentence.text, {
-          voiceURI: settings.ttsVoiceURI,
-          pitch: settings.ttsPitch,
-          rate: settings.ttsRate,
-          onEnd: () => {
-            spokenSentenceKeyRef.current = '';
-            handleNextSentence();
-          }
-        });
+      if (settings.readingMode === 'word') {
+        // Audio Mode ON + Word Mode: Speak current single word clearly & advance on end
+        const currentWord = sentence.words[wordIdx];
+        if (!currentWord) {
+          handleNextSentence();
+          return;
+        }
+
+        const currentWordKey = `${pageIdx}-${sentenceIdx}-${wordIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
+        if (spokenWordKeyRef.current !== currentWordKey) {
+          spokenWordKeyRef.current = currentWordKey;
+          speakSentence(currentWord.text, {
+            voiceURI: settings.ttsVoiceURI,
+            pitch: settings.ttsPitch,
+            rate: settings.ttsRate,
+            onEnd: () => {
+              spokenWordKeyRef.current = '';
+              advance();
+            },
+            onError: () => {
+              spokenWordKeyRef.current = '';
+              advance();
+            }
+          });
+        }
+      } else {
+        // Audio Mode ON + Sentence Mode: Speak full sentence fluently
+        const currentSentenceKey = `${pageIdx}-${sentenceIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
+        
+        if (spokenSentenceKeyRef.current !== currentSentenceKey) {
+          spokenSentenceKeyRef.current = currentSentenceKey;
+          speakSentence(sentence.text, {
+            voiceURI: settings.ttsVoiceURI,
+            pitch: settings.ttsPitch,
+            rate: settings.ttsRate,
+            onEnd: () => {
+              spokenSentenceKeyRef.current = '';
+              handleNextSentence();
+            },
+            onError: () => {
+              spokenSentenceKeyRef.current = '';
+              handleNextSentence();
+            }
+          });
+        }
       }
 
       return () => {
-        // Keep sentence speech active until sentence finishes or is paused
+        // Keep sentence/word speech active until utterance finishes or pause is clicked
       };
     } else {
       spokenSentenceKeyRef.current = '';
+      spokenWordKeyRef.current = '';
       // Audio Mode OFF: Pure visual RSVP WPM timer loop (1 word per tick)
       const msPerWord = Math.round(60000 / settings.wpm);
       timeoutRef.current = window.setTimeout(() => {
