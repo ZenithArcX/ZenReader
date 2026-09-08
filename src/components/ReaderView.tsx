@@ -5,7 +5,7 @@ import { AppSettings, ShelfItem } from '../storage/db';
 import { Controls } from './Controls';
 import { themes } from '../theme/colors';
 import { PageSelectorModal } from './PageSelectorModal';
-import { speakWord, stopSpeech, isScannedPlaceholder } from '../utils/tts';
+import { speakSentence, stopSpeech, isScannedPlaceholder } from '../utils/tts';
 
 interface Props {
   document: ReaderDocument;
@@ -34,6 +34,7 @@ export const ReaderView: React.FC<Props> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const timeoutRef = useRef<number | null>(null);
+  const spokenSentenceKeyRef = useRef<string>('');
 
   useEffect(() => {
     const handleFSChange = () => {
@@ -54,7 +55,7 @@ export const ReaderView: React.FC<Props> = ({
   const page = document.pages[pageIdx];
   const sentence = page?.sentences[sentenceIdx];
   
-  // Step size: 2 words at a time in Sentence Mode, 1 word in Word Mode
+  // Step size for Visual WPM Mode: 2 words at a time in Sentence Mode, 1 word in Word Mode
   const stepSize = settings.readingMode === 'sentence' ? 2 : 1;
 
   const handleNext = () => {
@@ -157,21 +158,25 @@ export const ReaderView: React.FC<Props> = ({
         case 'ArrowRight':
           e.preventDefault();
           stopSpeech();
+          spokenSentenceKeyRef.current = '';
           handleNext();
           break;
         case 'ArrowLeft':
           e.preventDefault();
           stopSpeech();
+          spokenSentenceKeyRef.current = '';
           handlePrev();
           break;
         case 'ArrowDown':
           e.preventDefault();
           stopSpeech();
+          spokenSentenceKeyRef.current = '';
           handleNextSentence();
           break;
         case 'ArrowUp':
           e.preventDefault();
           stopSpeech();
+          spokenSentenceKeyRef.current = '';
           handlePrevSentence();
           break;
         case 'Escape':
@@ -199,6 +204,7 @@ export const ReaderView: React.FC<Props> = ({
   useEffect(() => {
     if (!isPlaying || !sentence) {
       stopSpeech();
+      spokenSentenceKeyRef.current = '';
       return;
     }
 
@@ -211,33 +217,28 @@ export const ReaderView: React.FC<Props> = ({
     }
 
     if (settings.ttsEnabled) {
-      // Audio ON: Speak current active phrase (2 words in Sentence Mode, 1 word in Word Mode)
-      const currentPhraseText = sentence.words
-        .slice(wordIdx, wordIdx + stepSize)
-        .map(w => w.text)
-        .join(' ');
-
-      if (currentPhraseText) {
-        speakWord(currentPhraseText, {
+      // Audio Mode ON: Speak full sentence fluently as a natural continuous sentence!
+      const currentSentenceKey = `${pageIdx}-${sentenceIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
+      
+      if (spokenSentenceKeyRef.current !== currentSentenceKey) {
+        spokenSentenceKeyRef.current = currentSentenceKey;
+        speakSentence(sentence.text, {
           voiceURI: settings.ttsVoiceURI,
           pitch: settings.ttsPitch,
-          rate: settings.ttsRate
+          rate: settings.ttsRate,
+          onEnd: () => {
+            spokenSentenceKeyRef.current = '';
+            handleNextSentence();
+          }
         });
       }
 
-      // Visual chunk advancement timer driven by Voice Speed (ttsRate)
-      const msPerChunk = Math.max(180, Math.round((380 * stepSize) / settings.ttsRate));
-      timeoutRef.current = window.setTimeout(() => {
-        advance();
-      }, msPerChunk);
-
       return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
+        // Keep sentence speech active until sentence finishes or is paused
       };
     } else {
-      // Audio OFF: Visual RSVP WPM timer loop
+      spokenSentenceKeyRef.current = '';
+      // Audio Mode OFF: Pure visual RSVP WPM timer loop
       const msPerChunk = Math.round((60000 * stepSize) / settings.wpm);
       timeoutRef.current = window.setTimeout(() => {
         advance();
@@ -275,7 +276,7 @@ export const ReaderView: React.FC<Props> = ({
   const currentTheme = themes[settings.theme] || themes.light;
   const hideControls = isFocusMode || isLocked;
 
-  // Active 2-word chunk calculation for Sentence Mode
+  // Active 2-word chunk calculation for Visual WPM Sentence Mode
   const currentChunkIdx = Math.floor(wordIdx / 2);
 
   return (
@@ -448,7 +449,20 @@ export const ReaderView: React.FC<Props> = ({
               maxWidth: '100%'
             }}>
               {sentence.words.map((w, i) => {
-                // Highlight 2-word phrase chunks together in Sentence Mode
+                // If Audio Mode is ON, remove active word highlighting (render clean text without red letter / background pill)
+                if (settings.ttsEnabled) {
+                  return (
+                    <span key={i} style={{ 
+                      opacity: 1,
+                      padding: '3px 6px',
+                      display: 'inline-block'
+                    }}>
+                      {w.text}
+                    </span>
+                  );
+                }
+
+                // If Audio Mode is OFF (Visual WPM Mode), keep 2-word phrase chunking with Guided Optical Fixation
                 const isHighlighted = Math.floor(i / 2) === currentChunkIdx;
                 return (
                   <span key={i} style={{ 
@@ -487,10 +501,12 @@ export const ReaderView: React.FC<Props> = ({
             }}
             onNext={() => {
               stopSpeech();
+              spokenSentenceKeyRef.current = '';
               handleNext();
             }}
             onPrev={() => {
               stopSpeech();
+              spokenSentenceKeyRef.current = '';
               handlePrev();
             }}
             settings={settings}
@@ -510,6 +526,7 @@ export const ReaderView: React.FC<Props> = ({
           initialPageIdx={pageIdx}
           onSelectPage={(newIdx) => {
             stopSpeech();
+            spokenSentenceKeyRef.current = '';
             setPageIdx(newIdx);
             setSentenceIdx(0);
             setWordIdx(0);
