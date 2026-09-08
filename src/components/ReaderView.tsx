@@ -55,9 +55,6 @@ export const ReaderView: React.FC<Props> = ({
   
   const page = document.pages[pageIdx];
   const sentence = page?.sentences[sentenceIdx];
-  
-  // Step size: 1 word moves at a time
-  const stepSize = 1;
 
   const handleNext = () => {
     if (!page || !sentence) return false;
@@ -205,12 +202,41 @@ export const ReaderView: React.FC<Props> = ({
     onProgressUpdate({ currentPage: pageIdx, currentSentence: sentenceIdx, currentWord: wordIdx });
   }, [pageIdx, sentenceIdx, wordIdx]);
   
+  // Helper function to map character index from SpeechSynthesis to word index
+  const getWordIndexFromChar = (words: { text: string }[], text: string, charIdx: number): number => {
+    if (!words || words.length === 0) return 0;
+    let currentPos = 0;
+    for (let i = 0; i < words.length; i++) {
+      const wText = words[i].text;
+      const foundIdx = text.indexOf(wText, currentPos);
+      if (foundIdx !== -1) {
+        const wordEnd = foundIdx + wText.length;
+        if (charIdx >= foundIdx && charIdx <= wordEnd) {
+          return i;
+        }
+        currentPos = wordEnd;
+      }
+    }
+    // Fallback search
+    currentPos = 0;
+    for (let i = 0; i < words.length; i++) {
+      const wText = words[i].text;
+      const foundIdx = text.indexOf(wText, currentPos);
+      if (foundIdx !== -1) {
+        if (charIdx < foundIdx) {
+          return Math.max(0, i - 1);
+        }
+        currentPos = foundIdx + wText.length;
+      }
+    }
+    return words.length - 1;
+  };
+
   // Playback & Speech Engine Loop
   useEffect(() => {
     if (!isPlaying || !sentence) {
       stopSpeech();
       spokenSentenceKeyRef.current = '';
-      spokenWordKeyRef.current = '';
       return;
     }
 
@@ -223,59 +249,59 @@ export const ReaderView: React.FC<Props> = ({
     }
 
     if (settings.ttsEnabled) {
-      if (settings.readingMode === 'word') {
-        // Audio Mode ON + Word Mode: Speak current single word clearly & advance on end
-        const currentWord = sentence.words[wordIdx];
-        if (!currentWord) {
-          handleNextSentence();
-          return;
-        }
-
-        const currentWordKey = `${pageIdx}-${sentenceIdx}-${wordIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
-        if (spokenWordKeyRef.current !== currentWordKey) {
-          spokenWordKeyRef.current = currentWordKey;
-          speakSentence(currentWord.text, {
-            voiceURI: settings.ttsVoiceURI,
-            pitch: settings.ttsPitch,
-            rate: settings.ttsRate,
-            onEnd: () => {
-              spokenWordKeyRef.current = '';
-              advance();
-            },
-            onError: () => {
-              spokenWordKeyRef.current = '';
-              advance();
-            }
-          });
-        }
-      } else {
-        // Audio Mode ON + Sentence Mode: Speak full sentence fluently
-        const currentSentenceKey = `${pageIdx}-${sentenceIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
+      // Audio Mode ON: Speak sentence continuously while syncing wordIdx in real-time
+      const currentSentenceKey = `${pageIdx}-${sentenceIdx}-${settings.ttsRate}-${settings.ttsVoiceURI}-${settings.ttsPitch}`;
+      
+      if (spokenSentenceKeyRef.current !== currentSentenceKey) {
+        spokenSentenceKeyRef.current = currentSentenceKey;
         
-        if (spokenSentenceKeyRef.current !== currentSentenceKey) {
-          spokenSentenceKeyRef.current = currentSentenceKey;
-          speakSentence(sentence.text, {
-            voiceURI: settings.ttsVoiceURI,
-            pitch: settings.ttsPitch,
-            rate: settings.ttsRate,
-            onEnd: () => {
-              spokenSentenceKeyRef.current = '';
-              handleNextSentence();
-            },
-            onError: () => {
-              spokenSentenceKeyRef.current = '';
-              handleNextSentence();
+        let boundaryFired = false;
+        let fallbackTimer: number | null = null;
+
+        speakSentence(sentence.text, {
+          voiceURI: settings.ttsVoiceURI,
+          pitch: settings.ttsPitch,
+          rate: settings.ttsRate,
+          onWordBoundary: (charIndex) => {
+            boundaryFired = true;
+            if (sentence.words && sentence.words.length > 0) {
+              const matchedIdx = getWordIndexFromChar(sentence.words, sentence.text, charIndex);
+              setWordIdx(matchedIdx);
             }
-          });
+          },
+          onEnd: () => {
+            if (fallbackTimer) clearInterval(fallbackTimer);
+            spokenSentenceKeyRef.current = '';
+            handleNextSentence();
+          },
+          onError: () => {
+            if (fallbackTimer) clearInterval(fallbackTimer);
+            spokenSentenceKeyRef.current = '';
+            handleNextSentence();
+          }
+        });
+
+        // Fallback boundary timer for engines where speech.onboundary is not emitted
+        const wordCount = sentence.words.length;
+        if (wordCount > 1) {
+          const estimatedDurationMs = Math.max(800, (wordCount / (2.5 * settings.ttsRate)) * 1000);
+          const intervalMs = estimatedDurationMs / wordCount;
+          
+          let currentStep = 0;
+          fallbackTimer = window.setInterval(() => {
+            if (!boundaryFired && currentStep < wordCount - 1) {
+              currentStep++;
+              setWordIdx(currentStep);
+            }
+          }, intervalMs);
         }
       }
 
       return () => {
-        // Keep sentence/word speech active until utterance finishes or pause is clicked
+        // Speech remains active until utterance completes or user pauses
       };
     } else {
       spokenSentenceKeyRef.current = '';
-      spokenWordKeyRef.current = '';
       // Audio Mode OFF: Pure visual RSVP WPM timer loop (1 word per tick)
       const msPerWord = Math.round(60000 / settings.wpm);
       timeoutRef.current = window.setTimeout(() => {
@@ -292,8 +318,7 @@ export const ReaderView: React.FC<Props> = ({
     isPlaying,
     pageIdx,
     sentenceIdx,
-    wordIdx,
-    stepSize,
+    sentence,
     settings.readingMode,
     settings.ttsEnabled,
     settings.ttsVoiceURI,
