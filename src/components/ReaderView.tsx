@@ -446,7 +446,7 @@ export const ReaderView: React.FC<Props> = ({
               maxWidth: '100%'
             }}>
               {sentence.words.map((w, i) => {
-                // If Audio Mode is ON, render clean text without red letter / background pill
+                // If Audio Mode is ON, render all words with red fixation letter, but without active background highlight or dimming
                 if (settings.ttsEnabled) {
                   return (
                     <span key={i} style={{ 
@@ -454,12 +454,12 @@ export const ReaderView: React.FC<Props> = ({
                       padding: '3px 6px',
                       display: 'inline-block'
                     }}>
-                      {w.text}
+                      <FocusWord word={w.text} focusColor={settings.focusColor} />
                     </span>
                   );
                 }
 
-                // If Audio Mode is OFF (Visual WPM Mode), highlight 1 word at a time with Guided Optical Fixation
+                // If Audio Mode is OFF (Visual WPM Mode), highlight 1 word at a time with Guided Optical Fixation pill
                 const isHighlighted = i === wordIdx;
                 return (
                   <span key={i} style={{ 
