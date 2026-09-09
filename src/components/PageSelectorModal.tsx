@@ -21,6 +21,7 @@ export const PageSelectorModal: React.FC<Props> = ({
   onClose
 }) => {
   const [filterText, setFilterText] = useState('');
+  const [inputPageStr, setInputPageStr] = useState<string>((initialPageIdx + 1).toString());
   const [selectedPage, setSelectedPage] = useState<number>(initialPageIdx);
 
   const filteredPages = doc.pages.filter(p => {
@@ -30,6 +31,15 @@ export const PageSelectorModal: React.FC<Props> = ({
     const matchesSnippet = p.previewSnippet?.toLowerCase().includes(query);
     return matchesNumber || matchesSnippet;
   });
+
+  const handleJumpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const num = parseInt(inputPageStr, 10);
+    if (!isNaN(num)) {
+      const targetIdx = Math.max(1, Math.min(num, doc.pages.length)) - 1;
+      onSelectPage(targetIdx);
+    }
+  };
 
   return (
     <div style={{
@@ -66,7 +76,7 @@ export const PageSelectorModal: React.FC<Props> = ({
           <div>
             <h2 style={{ margin: 0, fontSize: '1.4rem' }}>{doc.title}</h2>
             <div style={{ fontSize: '0.85rem', color: theme.subtext, marginTop: '4px' }}>
-              Select a page preview ({doc.pages.length} total pages)
+              Select starting position ({doc.pages.length} total pages)
             </div>
           </div>
           <button 
@@ -82,6 +92,61 @@ export const PageSelectorModal: React.FC<Props> = ({
           >
             ✕ Close
           </button>
+        </div>
+
+        {/* Direct Page Number Entry */}
+        <div style={{
+          padding: '14px 24px',
+          background: theme.controlBg,
+          borderBottom: `1px solid ${theme.border}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <label style={{ fontSize: '0.88rem', fontWeight: 600, color: theme.text }}>
+            📄 Enter Starting Page Number (1 to {doc.pages.length}):
+          </label>
+          <form 
+            onSubmit={handleJumpSubmit}
+            style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}
+          >
+            <input
+              type="number"
+              min={1}
+              max={doc.pages.length}
+              value={inputPageStr}
+              onChange={(e) => setInputPageStr(e.target.value)}
+              placeholder="Page #"
+              style={{
+                width: '130px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: `1px solid ${theme.border}`,
+                background: theme.bg,
+                color: theme.text,
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                padding: '8px 18px',
+                borderRadius: '6px',
+                border: 'none',
+                background: '#10b981',
+                color: '#ffffff',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              ▶ Start Reading Page {inputPageStr || 1}
+            </button>
+          </form>
         </div>
 
         {/* Saved Progress Banner if present */}
@@ -115,11 +180,11 @@ export const PageSelectorModal: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Search & Jump Input */}
-        <div style={{ padding: '16px 24px', borderBottom: `1px solid ${theme.border}`, display: 'flex', gap: '12px' }}>
+        {/* Search Filter */}
+        <div style={{ padding: '12px 24px', borderBottom: `1px solid ${theme.border}`, display: 'flex', gap: '12px' }}>
           <input
             type="text"
-            placeholder="Search page content or page number..."
+            placeholder="Search page content snippet..."
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             style={{

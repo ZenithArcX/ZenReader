@@ -45,23 +45,6 @@ export default function App() {
       const doc = await parseDocument(file);
       
       const existing = shelf.find(s => s.id === file.name);
-      
-      // If single page document and no saved progress, start reading immediately!
-      if (doc.pages.length <= 1 && !existing) {
-        const progress: ShelfItem = {
-          id: doc.title,
-          filename: doc.title,
-          fileType: 'unknown',
-          progress: 0,
-          currentPage: 0,
-          currentSentence: 0,
-          currentWord: 0,
-          lastOpenedTime: Date.now()
-        };
-        setDocument(doc);
-        setCurrentProgress(progress);
-        return;
-      }
 
       setStartDialog({
         show: true,

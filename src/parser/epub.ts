@@ -96,20 +96,25 @@ export async function parseEpub(file: File): Promise<ReaderDocument> {
       const sentences = splitIntoSentences(cleanText);
       if (sentences.length === 0) continue;
 
-      const readerSentences: ReaderSentence[] = sentences.map(s => ({
-        text: s,
-        words: splitIntoWords(s).map(w => ({ text: w }))
-      }));
+      const MAX_SENTENCES_PER_PAGE = 25;
+      for (let sIdx = 0; sIdx < sentences.length; sIdx += MAX_SENTENCES_PER_PAGE) {
+        const chunkSentences = sentences.slice(sIdx, sIdx + MAX_SENTENCES_PER_PAGE);
+        const readerSentences: ReaderSentence[] = chunkSentences.map(s => ({
+          text: s,
+          words: splitIntoWords(s).map(w => ({ text: w }))
+        }));
 
-      const snippet = cleanText.length > 120 ? cleanText.substring(0, 120) + '...' : cleanText;
+        const chunkText = chunkSentences.join(' ');
+        const snippet = chunkText.length > 120 ? chunkText.substring(0, 120) + '...' : chunkText;
 
-      pages.push({
-        pageNumber: pages.length + 1,
-        sentences: readerSentences,
-        previewSnippet: snippet
-      });
+        pages.push({
+          pageNumber: pages.length + 1,
+          sentences: readerSentences,
+          previewSnippet: snippet
+        });
 
-      totalSentences += readerSentences.length;
+        totalSentences += readerSentences.length;
+      }
     } catch (err) {
       console.warn(`Error parsing EPUB entry ${filePath}:`, err);
     }

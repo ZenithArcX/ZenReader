@@ -22,27 +22,37 @@ export interface ReaderDocument {
 }
 
 export function parseTxt(text: string, title: string): ReaderDocument {
-  // A simple TXT parser treats the whole text as a single page
   const sentences = splitIntoSentences(text);
-  
-  const readerSentences: ReaderSentence[] = sentences.map(s => {
+  const pages: ReaderPage[] = [];
+  const MAX_SENTENCES_PER_PAGE = 25;
+
+  if (sentences.length === 0) {
     return {
+      title,
+      pages: [{ pageNumber: 1, sentences: [], previewSnippet: 'Empty document' }],
+      totalSentences: 0
+    };
+  }
+
+  for (let i = 0; i < sentences.length; i += MAX_SENTENCES_PER_PAGE) {
+    const chunk = sentences.slice(i, i + MAX_SENTENCES_PER_PAGE);
+    const readerSentences: ReaderSentence[] = chunk.map(s => ({
       text: s,
       words: splitIntoWords(s).map(w => ({ text: w }))
-    };
-  });
-  
-  const snippet = text.trim().length > 120 ? text.trim().substring(0, 120) + '...' : text.trim();
+    }));
+    const chunkText = chunk.join(' ');
+    const snippet = chunkText.length > 120 ? chunkText.substring(0, 120) + '...' : chunkText;
+
+    pages.push({
+      pageNumber: pages.length + 1,
+      sentences: readerSentences,
+      previewSnippet: snippet
+    });
+  }
 
   return {
     title,
-    pages: [
-      {
-        pageNumber: 1,
-        sentences: readerSentences,
-        previewSnippet: snippet
-      }
-    ],
-    totalSentences: readerSentences.length
+    pages,
+    totalSentences: sentences.length
   };
 }
