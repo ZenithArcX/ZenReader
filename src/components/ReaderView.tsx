@@ -36,6 +36,7 @@ export const ReaderView: React.FC<Props> = ({
   const timeoutRef = useRef<number | null>(null);
   const spokenSentenceKeyRef = useRef<string>('');
   const spokenWordKeyRef = useRef<string>('');
+  const activeWordRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     const handleFSChange = () => {
@@ -44,6 +45,17 @@ export const ReaderView: React.FC<Props> = ({
     window.document.addEventListener('fullscreenchange', handleFSChange);
     return () => window.document.removeEventListener('fullscreenchange', handleFSChange);
   }, []);
+
+  // Auto-scroll active word into view in sentence mode so long sentences never clip
+  useEffect(() => {
+    if (activeWordRef.current && settings.readingMode === 'sentence') {
+      activeWordRef.current.scrollIntoView({
+        block: 'nearest',
+        inline: 'nearest',
+        behavior: 'smooth'
+      });
+    }
+  }, [wordIdx, sentenceIdx, pageIdx, settings.readingMode]);
 
   const toggleFullscreen = () => {
     if (!window.document.fullscreenElement) {
@@ -553,13 +565,16 @@ export const ReaderView: React.FC<Props> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: `clamp(18px, ${settings.fontSize}px, 48px)`,
-            lineHeight: settings.lineHeight,
+            fontSize: settings.readingMode === 'sentence' && sentence.words.length > 25
+              ? `clamp(16px, calc(${settings.fontSize}px * 0.82), 34px)`
+              : `clamp(18px, ${settings.fontSize}px, 48px)`,
+            lineHeight: settings.readingMode === 'sentence' ? 1.6 : settings.lineHeight,
             cursor: 'pointer',
             padding: '12px',
             borderRadius: '12px',
             transition: 'background 0.2s ease',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            maxHeight: '100%'
           }}
         >
           {settings.readingMode === 'word' ? (
@@ -576,33 +591,48 @@ export const ReaderView: React.FC<Props> = ({
               gap: '6px 8px',
               alignItems: 'center',
               justifyContent: 'center',
-              maxWidth: '100%'
+              maxWidth: '100%',
+              maxHeight: '100%',
+              overflowY: 'auto',
+              padding: '12px 8px',
+              boxSizing: 'border-box',
+              scrollbarWidth: 'thin'
             }}>
               {sentence.words.map((w, i) => {
+                const isHighlighted = i === wordIdx;
+
                 // If Audio Mode is ON, render all words with red fixation letter, but without active background highlight or dimming
                 if (settings.ttsEnabled) {
                   return (
-                    <span key={i} style={{ 
-                      opacity: 1,
-                      padding: '3px 6px',
-                      display: 'inline-block'
-                    }}>
+                    <span 
+                      key={i}
+                      ref={isHighlighted ? activeWordRef : null}
+                      style={{ 
+                        opacity: 1,
+                        padding: '3px 6px',
+                        display: 'inline-block'
+                      }}
+                    >
                       <FocusWord word={w.text} focusColor={settings.focusColor} />
                     </span>
                   );
                 }
 
                 // If Audio Mode is OFF (Visual WPM Mode), highlight 1 word at a time with Guided Optical Fixation pill
-                const isHighlighted = i === wordIdx;
                 return (
-                  <span key={i} style={{ 
-                    opacity: isHighlighted ? 1 : 0.28,
-                    background: isHighlighted ? currentTheme.controlBg : 'transparent',
-                    border: `1px solid ${isHighlighted ? currentTheme.border : 'transparent'}`,
-                    padding: '3px 7px',
-                    borderRadius: '5px',
-                    display: 'inline-block'
-                  }}>
+                  <span 
+                    key={i}
+                    ref={isHighlighted ? activeWordRef : null}
+                    style={{ 
+                      opacity: isHighlighted ? 1 : 0.28,
+                      background: isHighlighted ? currentTheme.controlBg : 'transparent',
+                      border: `1px solid ${isHighlighted ? currentTheme.border : 'transparent'}`,
+                      padding: '3px 7px',
+                      borderRadius: '5px',
+                      display: 'inline-block',
+                      transition: 'background 0.15s ease, opacity 0.15s ease'
+                    }}
+                  >
                     <FocusWord word={w.text} focusColor={settings.focusColor} />
                   </span>
                 );
