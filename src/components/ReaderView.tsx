@@ -318,6 +318,7 @@ export const ReaderView: React.FC<Props> = ({
     isPlaying,
     pageIdx,
     sentenceIdx,
+    wordIdx,
     sentence,
     settings.readingMode,
     settings.ttsEnabled,
