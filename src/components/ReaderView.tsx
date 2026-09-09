@@ -163,6 +163,33 @@ export const ReaderView: React.FC<Props> = ({
     return null;
   };
 
+  const findPrevSentenceValidPos = (curPageIdx: number, curSentIdx: number) => {
+    const curP = document.pages[curPageIdx];
+
+    // 1. Same page, previous non-empty sentence
+    if (curP) {
+      for (let s = curSentIdx - 1; s >= 0; s--) {
+        if (curP.sentences[s] && curP.sentences[s].words.length > 0) {
+          return { pIdx: curPageIdx, sIdx: s, wIdx: 0 };
+        }
+      }
+    }
+
+    // 2. Preceding pages, last non-empty sentence
+    for (let p = curPageIdx - 1; p >= 0; p--) {
+      const prevPage = document.pages[p];
+      if (prevPage && prevPage.sentences) {
+        for (let s = prevPage.sentences.length - 1; s >= 0; s--) {
+          if (prevPage.sentences[s] && prevPage.sentences[s].words.length > 0) {
+            return { pIdx: p, sIdx: s, wIdx: 0 };
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
   const handleNext = () => {
     const nextPos = findNextValidPos(pageIdx, sentenceIdx, wordIdx);
     if (nextPos) {
@@ -196,20 +223,11 @@ export const ReaderView: React.FC<Props> = ({
   };
 
   const handlePrevSentence = () => {
-    const curP = document.pages[pageIdx];
-    if (sentenceIdx > 0 && curP) {
-      setSentenceIdx(s => s - 1);
-      setWordIdx(0);
-    } else if (pageIdx > 0) {
-      for (let p = pageIdx - 1; p >= 0; p--) {
-        const prevPage = document.pages[p];
-        if (prevPage && prevPage.sentences && prevPage.sentences.length > 0) {
-          setPageIdx(p);
-          setSentenceIdx(prevPage.sentences.length - 1);
-          setWordIdx(0);
-          break;
-        }
-      }
+    const prevPos = findPrevSentenceValidPos(pageIdx, sentenceIdx);
+    if (prevPos) {
+      setPageIdx(prevPos.pIdx);
+      setSentenceIdx(prevPos.sIdx);
+      setWordIdx(prevPos.wIdx);
     }
   };
   
@@ -239,14 +257,22 @@ export const ReaderView: React.FC<Props> = ({
           stopSpeech();
           spokenSentenceKeyRef.current = '';
           spokenWordKeyRef.current = '';
-          handleNext();
+          if (settings.readingMode === 'sentence') {
+            handleNextSentence();
+          } else {
+            handleNext();
+          }
           break;
         case 'ArrowLeft':
           e.preventDefault();
           stopSpeech();
           spokenSentenceKeyRef.current = '';
           spokenWordKeyRef.current = '';
-          handlePrev();
+          if (settings.readingMode === 'sentence') {
+            handlePrevSentence();
+          } else {
+            handlePrev();
+          }
           break;
         case 'ArrowDown':
           e.preventDefault();
@@ -660,12 +686,20 @@ export const ReaderView: React.FC<Props> = ({
             onNext={() => {
               stopSpeech();
               spokenSentenceKeyRef.current = '';
-              handleNext();
+              if (settings.readingMode === 'sentence') {
+                handleNextSentence();
+              } else {
+                handleNext();
+              }
             }}
             onPrev={() => {
               stopSpeech();
               spokenSentenceKeyRef.current = '';
-              handlePrev();
+              if (settings.readingMode === 'sentence') {
+                handlePrevSentence();
+              } else {
+                handlePrev();
+              }
             }}
             settings={settings}
             onSettingsChange={onSettingsChange}
