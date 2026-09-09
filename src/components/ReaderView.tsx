@@ -56,63 +56,127 @@ export const ReaderView: React.FC<Props> = ({
   const page = document.pages[pageIdx];
   const sentence = page?.sentences[sentenceIdx];
 
+  const findNextValidPos = (curPageIdx: number, curSentIdx: number, curWordIdx: number) => {
+    const curP = document.pages[curPageIdx];
+    const curS = curP?.sentences[curSentIdx];
+
+    // 1. Same sentence, next word
+    if (curS && curWordIdx + 1 < curS.words.length) {
+      return { pIdx: curPageIdx, sIdx: curSentIdx, wIdx: curWordIdx + 1 };
+    }
+
+    // 2. Same page, next non-empty sentence
+    if (curP) {
+      for (let s = curSentIdx + 1; s < curP.sentences.length; s++) {
+        if (curP.sentences[s].words.length > 0) {
+          return { pIdx: curPageIdx, sIdx: s, wIdx: 0 };
+        }
+      }
+    }
+
+    // 3. Subsequent pages, first non-empty sentence
+    for (let p = curPageIdx + 1; p < document.pages.length; p++) {
+      const nextPage = document.pages[p];
+      if (nextPage && nextPage.sentences) {
+        for (let s = 0; s < nextPage.sentences.length; s++) {
+          if (nextPage.sentences[s].words.length > 0) {
+            return { pIdx: p, sIdx: s, wIdx: 0 };
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const findNextSentenceValidPos = (curPageIdx: number, curSentIdx: number) => {
+    const curP = document.pages[curPageIdx];
+
+    // 1. Same page, next non-empty sentence
+    if (curP) {
+      for (let s = curSentIdx + 1; s < curP.sentences.length; s++) {
+        if (curP.sentences[s].words.length > 0) {
+          return { pIdx: curPageIdx, sIdx: s, wIdx: 0 };
+        }
+      }
+    }
+
+    // 2. Subsequent pages, first non-empty sentence
+    for (let p = curPageIdx + 1; p < document.pages.length; p++) {
+      const nextPage = document.pages[p];
+      if (nextPage && nextPage.sentences) {
+        for (let s = 0; s < nextPage.sentences.length; s++) {
+          if (nextPage.sentences[s].words.length > 0) {
+            return { pIdx: p, sIdx: s, wIdx: 0 };
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const findPrevValidPos = (curPageIdx: number, curSentIdx: number, curWordIdx: number) => {
+    const curP = document.pages[curPageIdx];
+    const curS = curP?.sentences[curSentIdx];
+
+    // 1. Same sentence, previous word
+    if (curS && curWordIdx > 0) {
+      return { pIdx: curPageIdx, sIdx: curSentIdx, wIdx: curWordIdx - 1 };
+    }
+
+    // 2. Same page, previous non-empty sentence
+    if (curP) {
+      for (let s = curSentIdx - 1; s >= 0; s--) {
+        const sent = curP.sentences[s];
+        if (sent && sent.words.length > 0) {
+          return { pIdx: curPageIdx, sIdx: s, wIdx: sent.words.length - 1 };
+        }
+      }
+    }
+
+    // 3. Preceding pages, last non-empty sentence
+    for (let p = curPageIdx - 1; p >= 0; p--) {
+      const prevPage = document.pages[p];
+      if (prevPage && prevPage.sentences) {
+        for (let s = prevPage.sentences.length - 1; s >= 0; s--) {
+          const sent = prevPage.sentences[s];
+          if (sent && sent.words.length > 0) {
+            return { pIdx: p, sIdx: s, wIdx: sent.words.length - 1 };
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
   const handleNext = () => {
-    if (!page || !sentence) return false;
-    
-    if (wordIdx + 1 < sentence.words.length) {
-      setWordIdx(w => w + 1);
+    const nextPos = findNextValidPos(pageIdx, sentenceIdx, wordIdx);
+    if (nextPos) {
+      setPageIdx(nextPos.pIdx);
+      setSentenceIdx(nextPos.sIdx);
+      setWordIdx(nextPos.wIdx);
       return true;
     }
-    
-    if (sentenceIdx + 1 < page.sentences.length) {
-      setSentenceIdx(s => s + 1);
-      setWordIdx(0);
-      return true;
-    }
-    
-    if (pageIdx + 1 < document.pages.length) {
-      setPageIdx(p => p + 1);
-      setSentenceIdx(0);
-      setWordIdx(0);
-      return true;
-    }
-    
     return false;
   };
-  
+
   const handlePrev = () => {
-    if (!page || !sentence) return;
-    
-    if (wordIdx > 0) {
-      setWordIdx(w => w - 1);
-      return;
-    }
-    
-    if (sentenceIdx > 0) {
-      const prevSentence = page.sentences[sentenceIdx - 1];
-      setSentenceIdx(s => s - 1);
-      setWordIdx(prevSentence ? Math.max(0, prevSentence.words.length - 1) : 0);
-      return;
-    }
-    
-    if (pageIdx > 0) {
-      const prevPage = document.pages[pageIdx - 1];
-      const lastSentence = prevPage?.sentences[prevPage.sentences.length - 1];
-      setPageIdx(p => p - 1);
-      setSentenceIdx(prevPage ? Math.max(0, prevPage.sentences.length - 1) : 0);
-      setWordIdx(lastSentence ? Math.max(0, lastSentence.words.length - 1) : 0);
+    const prevPos = findPrevValidPos(pageIdx, sentenceIdx, wordIdx);
+    if (prevPos) {
+      setPageIdx(prevPos.pIdx);
+      setSentenceIdx(prevPos.sIdx);
+      setWordIdx(prevPos.wIdx);
     }
   };
 
   const handleNextSentence = () => {
-    if (!page) return;
-    if (sentenceIdx + 1 < page.sentences.length) {
-      setSentenceIdx(s => s + 1);
-      setWordIdx(0);
-    } else if (pageIdx + 1 < document.pages.length) {
-      setPageIdx(p => p + 1);
-      setSentenceIdx(0);
-      setWordIdx(0);
+    const nextPos = findNextSentenceValidPos(pageIdx, sentenceIdx);
+    if (nextPos) {
+      setPageIdx(nextPos.pIdx);
+      setSentenceIdx(nextPos.sIdx);
+      setWordIdx(nextPos.wIdx);
     } else {
       setIsPlaying(false);
       stopSpeech();
@@ -120,15 +184,20 @@ export const ReaderView: React.FC<Props> = ({
   };
 
   const handlePrevSentence = () => {
-    if (!page) return;
-    if (sentenceIdx > 0) {
+    const curP = document.pages[pageIdx];
+    if (sentenceIdx > 0 && curP) {
       setSentenceIdx(s => s - 1);
       setWordIdx(0);
     } else if (pageIdx > 0) {
-      const prevPage = document.pages[pageIdx - 1];
-      setPageIdx(p => p - 1);
-      setSentenceIdx(prevPage ? Math.max(0, prevPage.sentences.length - 1) : 0);
-      setWordIdx(0);
+      for (let p = pageIdx - 1; p >= 0; p--) {
+        const prevPage = document.pages[p];
+        if (prevPage && prevPage.sentences && prevPage.sentences.length > 0) {
+          setPageIdx(p);
+          setSentenceIdx(prevPage.sentences.length - 1);
+          setWordIdx(0);
+          break;
+        }
+      }
     }
   };
   
